@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catálogo de Herramientas - Global</title>
+    <title>Catálogo Pro - Rápido</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -19,44 +19,66 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- CONFIGURACIÓN DE TU SUPABASE ---
+        // Configuración de tu proyecto
         const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
-        
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Iconos
-        const Plus = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
-        const Trash2 = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
-        const Package = ({ className }) => <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>;
-
-        function CatalogoHerramientas() {
+        function App() {
             const [herramientas, setHerramientas] = useState([]);
-            const [mostrarFormulario, setMostrarFormulario] = useState(false);
-            const [cargando, setCargando] = useState(true);
-            const [subiendo, setSubiendo] = useState(false);
             const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto: null });
+            const [mostrar, setMostrar] = useState(false);
+            const [cargando, setCargando] = useState(true);
+            const [enviando, setEnviando] = useState(false);
 
-            useEffect(() => { fetchHerramientas(); }, []);
+            useEffect(() => { cargarDatos(); }, []);
 
-            const fetchHerramientas = async () => {
+            const cargarDatos = async () => {
                 const { data } = await supabase.from('herramientas').select('*').order('created_at', { ascending: false });
                 if (data) setHerramientas(data);
                 setCargando(false);
             };
 
-            const guardarHerramienta = async () => {
-                if (!form.nombre || !form.cantidad) return alert("Por favor, llena nombre y cantidad.");
-                setSubiendo(true);
+            // Función para que las imágenes pesen muy poco y suban rápido
+            const optimizarImagen = (archivo) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(archivo);
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.src = e.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800; // Resolución optimizada
+                            const scale = MAX_WIDTH / img.width;
+                            canvas.width = MAX_WIDTH;
+                            canvas.height = img.height * scale;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7); // Compresión al 70%
+                        };
+                    };
+                });
+            };
 
-                let fotoUrl = 'https://via.placeholder.com/300x200?text=Sin+Foto';
+            const guardar = async () => {
+                if (!form.nombre || !form.cantidad) return alert("Nombre y cantidad obligatorios");
+                setEnviando(true);
+
+                let urlFinal = 'https://via.placeholder.com/300x200?text=Sin+Foto';
 
                 if (form.foto) {
-                    const fileName = `${Date.now()}-${form.foto.name}`;
-                    const { data: storageData } = await supabase.storage.from('herramientas').upload(fileName, form.foto);
-                    if (storageData) {
-                        const { data: urlData } = supabase.storage.from('herramientas').getPublicUrl(fileName);
-                        fotoUrl = urlData.publicUrl;
+                    const fotoChica = await optimizarImagen(form.foto);
+                    const nombreArchivo = `${Date.now()}.jpg`;
+                    
+                    // Sube al bucket 'herramientas' que configuramos
+                    const { data: uploadData } = await supabase.storage
+                        .from('herramientas')
+                        .upload(nombreArchivo, fotoChica);
+
+                    if (uploadData) {
+                        const { data } = supabase.storage.from('herramientas').getPublicUrl(nombreArchivo);
+                        urlFinal = data.publicUrl;
                     }
                 }
 
@@ -64,115 +86,72 @@
                     nombre: form.nombre, 
                     cantidad: parseInt(form.cantidad), 
                     lugar: form.lugar, 
-                    foto_url: fotoUrl 
+                    foto_url: urlFinal 
                 }]);
 
                 setForm({ nombre: '', cantidad: '', lugar: '', foto: null });
-                setMostrarFormulario(false);
-                setSubiendo(false);
-                fetchHerramientas();
+                setMostrar(false);
+                setEnviando(false);
+                cargarDatos();
             };
 
             const eliminar = async (id) => {
-                if (confirm("¿Eliminar herramienta para todos los usuarios?")) {
+                if (confirm("¿Eliminar herramienta?")) {
                     await supabase.from('herramientas').delete().eq('id', id);
-                    fetchHerramientas();
+                    cargarDatos();
                 }
             };
 
-            if (cargando) return (
-                <div className="min-h-screen flex flex-col items-center justify-center">
-                    <Package className="w-12 h-12 text-orange-500 animate-bounce mb-4" />
-                    <p className="text-xl font-bold">Cargando Inventario Global...</p>
-                </div>
-            );
+            if (cargando) return <div className="p-10 text-center text-xl">Cargando inventario...</div>;
 
             return (
-                <div className="min-h-screen p-4 md:p-8">
-                    <div className="max-w-6xl mx-auto">
-                        <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
-                            <div className="flex items-center gap-3">
-                                <Package className="w-10 h-10 text-orange-500" />
-                                <h1 className="text-3xl font-bold">Catálogo Profesional</h1>
+                <div className="max-w-5xl mx-auto p-4">
+                    <header className="flex justify-between items-center py-6">
+                        <h1 className="text-3xl font-bold text-orange-500">Mi Catálogo Cloud</h1>
+                        <button onClick={() => setMostrar(!mostrar)} className="bg-orange-600 hover:bg-orange-500 px-5 py-2 rounded-full font-bold transition">
+                            {mostrar ? 'Cerrar' : '+ Agregar'}
+                        </button>
+                    </header>
+
+                    {mostrar && (
+                        <div className="bg-slate-800 p-6 rounded-2xl mb-8 border border-slate-700 animate-pulse-once">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input type="text" placeholder="Nombre (Ej: Martillo)" className="bg-slate-900 p-3 rounded-lg border border-slate-700" onChange={e => setForm({...form, nombre: e.target.value})} />
+                                <input type="number" placeholder="Cantidad" className="bg-slate-900 p-3 rounded-lg border border-slate-700" onChange={e => setForm({...form, cantidad: e.target.value})} />
+                                <input type="text" placeholder="Ubicación" className="bg-slate-900 p-3 rounded-lg border border-slate-700" onChange={e => setForm({...form, lugar: e.target.value})} />
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs text-slate-400">Seleccionar Foto:</label>
+                                    <input type="file" accept="image/*" onChange={e => setForm({...form, foto: e.target.files[0]})} />
+                                </div>
                             </div>
-                            <button 
-                                onClick={() => setMostrarFormulario(true)}
-                                className="bg-orange-500 hover:bg-orange-600 px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-all active:scale-95"
-                            >
-                                <Plus /> Agregar Herramienta
+                            <button onClick={guardar} disabled={enviando} className="mt-6 w-full bg-green-600 hover:bg-green-500 p-3 rounded-xl font-bold disabled:opacity-50">
+                                {enviando ? 'Subiendo material rápido...' : 'Guardar en Catálogo'}
                             </button>
-                        </header>
+                        </div>
+                    )}
 
-                        {mostrarFormulario && (
-                            <div className="bg-slate-800 p-6 rounded-2xl mb-10 border border-slate-700 shadow-2xl animate-in fade-in zoom-in duration-300">
-                                <h2 className="text-xl font-bold mb-6">Detalles de la Herramienta</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                    <div className="space-y-2">
-                                        <label className="text-sm text-slate-400">Nombre *</label>
-                                        <input type="text" className="w-full bg-slate-900 border border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" 
-                                            placeholder="Ej: Taladro Bosch" onChange={e => setForm({...form, nombre: e.target.value})} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm text-slate-400">Cantidad *</label>
-                                        <input type="number" className="w-full bg-slate-900 border border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" 
-                                            placeholder="1" onChange={e => setForm({...form, cantidad: e.target.value})} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm text-slate-400">Ubicación</label>
-                                        <input type="text" className="w-full bg-slate-900 border border-slate-700 p-3 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" 
-                                            placeholder="Ej: Almacén A" onChange={e => setForm({...form, lugar: e.target.value})} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm text-slate-400">Foto</label>
-                                        <input type="file" className="w-full text-sm" onChange={e => setForm({...form, foto: e.target.files[0]})} />
-                                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {herramientas.map(h => (
+                            <div key={h.id} className="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 group">
+                                <div className="h-44 bg-slate-700">
+                                    <img src={h.foto_url} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" alt={h.nombre} />
                                 </div>
-                                <div className="flex gap-4">
-                                    <button onClick={guardarHerramienta} disabled={subiendo} 
-                                        className="bg-green-600 hover:bg-green-700 px-8 py-3 rounded-lg font-bold disabled:opacity-50 transition-colors">
-                                        {subiendo ? 'Subiendo...' : 'Guardar en la Nube'}
-                                    </button>
-                                    <button onClick={() => setMostrarFormulario(false)} className="bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-lg font-bold transition-colors">
-                                        Cancelar
-                                    </button>
+                                <div className="p-4">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h2 className="text-xl font-bold uppercase">{h.nombre}</h2>
+                                        <span className="bg-orange-500/20 text-orange-500 px-3 py-1 rounded-lg font-bold">x{h.cantidad}</span>
+                                    </div>
+                                    <p className="text-slate-400 text-sm italic mb-4">📍 {h.lugar || 'Sin ubicación'}</p>
+                                    <button onClick={() => eliminar(h.id)} className="text-red-400 text-sm hover:underline">Eliminar registro</button>
                                 </div>
                             </div>
-                        )}
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                            {herramientas.length === 0 ? (
-                                <p className="col-span-full text-center text-slate-500 py-20 text-lg italic border-2 border-dashed border-slate-700 rounded-2xl">
-                                    El catálogo está vacío. ¡Agrega algo para empezar!
-                                </p>
-                            ) : (
-                                herramientas.map(h => (
-                                    <div key={h.id} className="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 hover:border-orange-500/50 hover:shadow-2xl hover:shadow-orange-500/10 transition-all group">
-                                        <div className="h-48 overflow-hidden">
-                                            <img src={h.foto_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={h.nombre} />
-                                        </div>
-                                        <div className="p-5">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h3 className="font-bold text-xl leading-tight">{h.nombre}</h3>
-                                                <span className="bg-orange-500/20 text-orange-500 text-sm px-3 py-1 rounded-full font-bold">x{h.cantidad}</span>
-                                            </div>
-                                            <p className="text-slate-400 text-sm mb-6 flex items-center gap-1 italic">
-                                                <span>📍</span> {h.lugar || 'Sin ubicación'}
-                                            </p>
-                                            <button onClick={() => eliminar(h.id)} 
-                                                className="w-full bg-slate-900/50 text-red-400 hover:bg-red-500 hover:text-white p-2 rounded-lg transition-all flex justify-center border border-red-500/20">
-                                                <Trash2 />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
+                        ))}
                     </div>
                 </div>
             );
         }
 
-        ReactDOM.render(<CatalogoHerramientas />, document.getElementById('root'));
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>
