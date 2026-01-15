@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catálogo Pro - Rápido</title>
+    <title>Catálogo Maestro - Búsqueda</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -11,13 +11,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        .search-focus:focus { box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.3); }
     </style>
 </head>
 <body class="bg-slate-900 text-white">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
         const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
@@ -25,6 +26,7 @@
 
         function App() {
             const [herramientas, setHerramientas] = useState([]);
+            const [busqueda, setBusqueda] = useState('');
             const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto: null });
             const [mostrar, setMostrar] = useState(false);
             const [cargando, setCargando] = useState(true);
@@ -38,6 +40,14 @@
                 setCargando(false);
             };
 
+            // Filtrado en tiempo real
+            const herramientasFiltradas = useMemo(() => {
+                return herramientas.filter(h => 
+                    h.nombre.toLowerCase().includes(busqueda.toLowerCase()) || 
+                    (h.lugar && h.lugar.toLowerCase().includes(busqueda.toLowerCase()))
+                );
+            }, [busqueda, herramientas]);
+
             const optimizarImagen = (archivo) => {
                 return new Promise((resolve) => {
                     const reader = new FileReader();
@@ -47,7 +57,7 @@
                         img.src = e.target.result;
                         img.onload = () => {
                             const canvas = document.createElement('canvas');
-                            const MAX_WIDTH = 1200; // Un poco más de calidad para verla mejor
+                            const MAX_WIDTH = 1000;
                             const scale = MAX_WIDTH / img.width;
                             canvas.width = MAX_WIDTH;
                             canvas.height = img.height * scale;
@@ -94,80 +104,90 @@
                 }
             };
 
-            if (cargando) return <div className="p-10 text-center text-xl text-orange-500">Actualizando inventario...</div>;
+            if (cargando) return <div className="p-10 text-center text-xl text-orange-500 font-bold">Actualizando base de datos...</div>;
 
             return (
-                <div className="max-w-6xl mx-auto p-4">
-                    <header className="flex justify-between items-center py-6 border-b border-slate-800 mb-8">
+                <div className="max-w-6xl mx-auto p-4 lg:p-8">
+                    {/* ENCABEZADO */}
+                    <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
                         <div>
-                            <h1 className="text-3xl font-bold text-orange-500">Inventario Maestro</h1>
-                            <p className="text-slate-500 text-sm">Control de herramientas en tiempo real</p>
+                            <h1 className="text-4xl font-black text-white tracking-tighter italic">INVENTARIO <span className="text-orange-500 underline">CLOUD</span></h1>
+                            <p className="text-slate-500 font-medium">Control total de materiales</p>
                         </div>
-                        <button onClick={() => setMostrar(!mostrar)} className="bg-orange-600 hover:bg-orange-500 px-6 py-2 rounded-xl font-bold transition shadow-lg shadow-orange-900/20">
-                            {mostrar ? 'Cerrar Panel' : '+ Nueva Herramienta'}
+                        <button onClick={() => setMostrar(!mostrar)} className="w-full md:w-auto bg-orange-600 hover:bg-orange-500 px-8 py-3 rounded-2xl font-black text-lg transition-all shadow-xl shadow-orange-900/40">
+                            {mostrar ? '✕ CERRAR PANEL' : '+ AGREGAR NUEVO'}
                         </button>
                     </header>
 
+                    {/* BARRA DE BÚSQUEDA */}
+                    <div className="relative mb-10">
+                        <input 
+                            type="text" 
+                            placeholder="🔍 Buscar herramienta por nombre o ubicación..." 
+                            className="w-full bg-slate-800 p-5 pl-12 rounded-2xl border border-slate-700 outline-none text-xl search-focus transition-all"
+                            value={busqueda}
+                            onChange={(e) => setBusqueda(e.target.value)}
+                        />
+                        {busqueda && (
+                            <button 
+                                onClick={() => setBusqueda('')} 
+                                className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white font-bold"
+                            >
+                                LIMPIAR
+                            </button>
+                        )}
+                    </div>
+
+                    {/* FORMULARIO */}
                     {mostrar && (
-                        <div className="bg-slate-800 p-8 rounded-3xl mb-10 border border-slate-700 shadow-2xl">
-                            <h2 className="text-xl font-bold mb-6 text-slate-200">Registrar nuevo material</h2>
+                        <div className="bg-slate-800 p-8 rounded-3xl mb-12 border-2 border-orange-500/30 shadow-2xl">
+                            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">📝 Nuevo Registro</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-semibold text-slate-400 uppercase">¿Qué es?</label>
-                                    <input type="text" placeholder="Ej: Taladro Bosch" className="w-full bg-slate-900 p-3 rounded-xl border border-slate-700 focus:border-orange-500 outline-none" onChange={e => setForm({...form, nombre: e.target.value})} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-semibold text-slate-400 uppercase">Cantidad</label>
-                                    <input type="number" placeholder="0" className="w-full bg-slate-900 p-3 rounded-xl border border-slate-700 focus:border-orange-500 outline-none" onChange={e => setForm({...form, cantidad: e.target.value})} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-semibold text-slate-400 uppercase">Ubicación / Lugar</label>
-                                    <input type="text" placeholder="Ej: Bodega A" className="w-full bg-slate-900 p-3 rounded-xl border border-slate-700 focus:border-orange-500 outline-none" onChange={e => setForm({...form, lugar: e.target.value})} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-semibold text-slate-400 uppercase">Fotografía</label>
-                                    <input type="file" accept="image/*" className="text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-600 file:text-white hover:file:bg-orange-500" onChange={e => setForm({...form, foto: e.target.files[0]})} />
+                                <input type="text" placeholder="Nombre de herramienta" className="bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none focus:border-orange-500" onChange={e => setForm({...form, nombre: e.target.value})} />
+                                <input type="number" placeholder="Cantidad" className="bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none focus:border-orange-500" onChange={e => setForm({...form, cantidad: e.target.value})} />
+                                <input type="text" placeholder="Ubicación" className="bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none focus:border-orange-500" onChange={e => setForm({...form, lugar: e.target.value})} />
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-[10px] font-bold text-orange-500 uppercase ml-2">Foto de material</label>
+                                    <input type="file" accept="image/*" className="text-sm text-slate-400 file:bg-slate-700 file:text-white file:border-0 file:rounded-lg file:px-3 file:py-1 cursor-pointer" onChange={e => setForm({...form, foto: e.target.files[0]})} />
                                 </div>
                             </div>
-                            <button onClick={guardar} disabled={enviando} className="mt-8 w-full bg-green-600 hover:bg-green-500 p-4 rounded-2xl font-bold transition-all disabled:opacity-50 text-lg shadow-lg shadow-green-900/20">
-                                {enviando ? '🚀 Subiendo y optimizando...' : 'Confirmar y Guardar'}
+                            <button onClick={guardar} disabled={enviando} className="mt-8 w-full bg-green-600 hover:bg-green-500 p-4 rounded-2xl font-black text-xl transition-all disabled:opacity-50">
+                                {enviando ? 'PROCESANDO...' : 'GUARDAR AHORA'}
                             </button>
                         </div>
                     )}
 
+                    {/* GRILLA DE RESULTADOS */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                        {herramientas.map(h => (
-                            <div key={h.id} className="bg-slate-800 rounded-3xl overflow-hidden border border-slate-700 hover:border-orange-500/50 transition-all duration-300 shadow-xl flex flex-col">
-                                {/* IMAGEN GRANDE Y COMPLETA */}
-                                <div className="h-64 bg-black/40 flex items-center justify-center p-2">
-                                    <img 
-                                        src={h.foto_url} 
-                                        className="w-full h-full object-contain" 
-                                        alt={h.nombre} 
-                                    />
-                                </div>
-                                
-                                <div className="p-6 flex-grow flex flex-col justify-between">
-                                    <div>
-                                        <div className="flex justify-between items-start gap-2 mb-2">
-                                            <h2 className="text-xl font-black text-white leading-tight uppercase tracking-tight">{h.nombre}</h2>
-                                            <span className="bg-orange-500 text-white text-sm px-3 py-1 rounded-lg font-black shrink-0">x{h.cantidad}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-slate-400 mb-6">
-                                            <span className="text-lg text-orange-500">📍</span>
-                                            <span className="text-sm font-medium">{h.lugar || 'Sin ubicación'}</span>
-                                        </div>
+                        {herramientasFiltradas.length > 0 ? (
+                            herramientasFiltradas.map(h => (
+                                <div key={h.id} className="bg-slate-800 rounded-[2rem] overflow-hidden border border-slate-700 flex flex-col hover:scale-[1.02] transition-transform duration-300">
+                                    <div className="h-64 bg-black/60 flex items-center justify-center p-3">
+                                        <img src={h.foto_url} className="w-full h-full object-contain" alt={h.nombre} />
                                     </div>
-                                    
-                                    <button 
-                                        onClick={() => eliminar(h.id)} 
-                                        className="w-full py-2 text-red-400 text-xs font-bold uppercase tracking-widest border border-red-400/20 rounded-xl hover:bg-red-500/10 transition"
-                                    >
-                                        Eliminar Registro
-                                    </button>
+                                    <div className="p-6 flex flex-col flex-grow">
+                                        <div className="flex justify-between items-start gap-2 mb-4">
+                                            <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">{h.nombre}</h2>
+                                            <span className="bg-orange-600 text-white px-3 py-1 rounded-xl font-black text-sm">x{h.cantidad}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-slate-400 mb-6 font-medium">
+                                            <span className="text-orange-500">📍</span>
+                                            <span className="truncate">{h.lugar || 'N/A'}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => eliminar(h.id)} 
+                                            className="mt-auto w-full py-3 text-red-500 text-[10px] font-black uppercase tracking-[0.2em] border border-red-500/20 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                                        >
+                                            Borrar del sistema
+                                        </button>
+                                    </div>
                                 </div>
+                            ))
+                        ) : (
+                            <div className="col-span-full py-20 text-center">
+                                <p className="text-3xl font-bold text-slate-700 italic">"No se encontró ninguna herramienta"</p>
                             </div>
-                        ))}
+                        )}
                     </div>
                 </div>
             );
