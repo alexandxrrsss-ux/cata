@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster - Automatizado</title>
+    <title>StockMaster Pro - Full Fix</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { background-color: #0f172a; color: white; scroll-behavior: smooth; }
+        body { background-color: #0f172a; color: white; }
         .admin-border { border: 2px solid #ea580c; }
         .agotado { filter: grayscale(1); opacity: 0.6; }
-        .card-shadow { shadow-lg shadow-black/50; }
     </style>
 </head>
 <body>
@@ -34,184 +33,198 @@
             const [busqueda, setBusqueda] = useState('');
             const [isAdmin, setIsAdmin] = useState(false);
             const [verPedidos, setVerPedidos] = useState(false);
+            const [mostrarAdd, setMostrarAdd] = useState(false);
             const [mostrarLogin, setMostrarLogin] = useState(false);
             const [passInput, setPassInput] = useState('');
-            const [cargando, setCargando] = useState(true);
+            const [enviando, setEnviando] = useState(false);
+            const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto: null });
 
             useEffect(() => { 
                 cargarDatos();
-                const interval = setInterval(cargarPedidos, 10000); // Auto-actualiza pedidos cada 10 seg
-                return () => clearInterval(interval);
+                cargarPedidos();
             }, []);
 
             const cargarDatos = async () => {
                 const { data } = await supabase.from('herramientas').select('*').order('created_at', { ascending: false });
                 if (data) setHerramientas(data);
-                setCargando(false);
             };
 
             const cargarPedidos = async () => {
-                const { data } = await supabase.from('pedidos').select('*').eq('estado', 'pendiente').order('created_at', { ascending: false });
+                const { data } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
                 if (data) setPedidos(data);
             };
 
-            const handleLogin = () => {
-                if (passInput === ADMIN_PASSWORD) {
-                    setIsAdmin(true);
-                    setMostrarLogin(false);
-                    setPassInput('');
-                    cargarPedidos();
-                } else { alert("Contraseña incorrecta"); }
+            const optimizarImagen = (archivo) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(archivo);
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.src = e.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800;
+                            const scale = MAX_WIDTH / img.width;
+                            canvas.width = MAX_WIDTH;
+                            canvas.height = img.height * scale;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
+                        };
+                    };
+                });
             };
 
-            const enviarSolicitud = async (h) => {
-                const uNombre = prompt("Tu nombre:");
-                const uTarea = prompt("¿Para qué tarea?");
-                const uCant = prompt(`¿Cuántos ${h.nombre} necesitas? (Máximo ${h.cantidad})`);
-                
-                if (uNombre && uTarea && uCant) {
-                    if (parseInt(uCant) > h.cantidad) return alert("No hay suficiente stock para ese pedido.");
-                    
-                    const { error } = await supabase.from('pedidos').insert([
-                        { 
-                            herramienta_id: h.id, 
-                            herramienta_nombre: h.nombre, 
-                            usuario_nombre: uNombre, 
-                            tarea: uTarea, 
-                            cantidad_pedida: parseInt(uCant) 
-                        }
-                    ]);
-                    if (!error) alert("Solicitud enviada. El administrador descontará el stock al entregarte el material.");
-                }
-            };
+            const guardarNuevoMaterial = async () => {
+                if (!form.nombre || !form.cantidad) return alert("Faltan datos");
+                setEnviando(true);
+                let urlFinal = 'https://via.placeholder.com/300x200?text=Sin+Foto';
 
-            // --- FUNCIÓN CLAVE: ENTREGAR Y RESTAR ---
-            const procesarEntrega = async (pedido) => {
-                // 1. Buscamos la herramienta actual
-                const { data: herramienta } = await supabase.from('herramientas').select('cantidad').eq('id', pedido.herramienta_id).single();
-                
-                if (herramienta) {
-                    const nuevaCantidad = herramienta.cantidad - pedido.cantidad_pedida;
-                    
-                    if (nuevaCantidad < 0) {
-                        alert("Error: No puedes entregar más de lo que hay en stock.");
-                        return;
+                if (form.foto) {
+                    const fotoChica = await optimizarImagen(form.foto);
+                    const nombreArchivo = `${Date.now()}.jpg`;
+                    const { data: uploadData } = await supabase.storage.from('herramientas').upload(nombreArchivo, fotoChica);
+                    if (uploadData) {
+                        const { data } = supabase.storage.from('herramientas').getPublicUrl(nombreArchivo);
+                        urlFinal = data.publicUrl;
                     }
+                }
 
-                    // 2. Restamos del inventario
-                    await supabase.from('herramientas').update({ cantidad: nuevaCantidad }).eq('id', pedido.herramienta_id);
-                    
-                    // 3. Marcamos pedido como entregado (o borramos)
-                    await supabase.from('pedidos').delete().eq('id', pedido.id);
-                    
-                    alert("Stock actualizado y pedido procesado.");
-                    cargarDatos();
-                    cargarPedidos();
+                await supabase.from('herramientas').insert([{ 
+                    nombre: form.nombre, 
+                    cantidad: parseInt(form.cantidad), 
+                    lugar: form.lugar, 
+                    foto_url: urlFinal 
+                }]);
+
+                setForm({ nombre: '', cantidad: '', lugar: '', foto: null });
+                setMostrarAdd(false);
+                setEnviando(false);
+                cargarDatos();
+            };
+
+            const procesarEntrega = async (pedido) => {
+                // Buscamos la herramienta en el estado local para obtener el stock actual
+                const hActual = herramientas.find(h => h.id === pedido.herramienta_id);
+                
+                if (!hActual) {
+                    // Si no tiene ID (pedidos viejos), buscamos por nombre
+                    const { data: hDB } = await supabase.from('herramientas').select('*').eq('nombre', pedido.herramienta_nombre).single();
+                    if(hDB) realizarResta(hDB, pedido);
+                } else {
+                    realizarResta(hActual, pedido);
                 }
             };
 
-            const eliminarPedido = async (id) => {
-                await supabase.from('pedidos').delete().eq('id', id);
-                cargarPedidos();
-            };
+            const realizarResta = async (herramienta, pedido) => {
+                const nuevaCant = herramienta.cantidad - pedido.cantidad_pedida;
+                if (nuevaCant < 0) return alert("Stock insuficiente");
 
-            const actualizarStockManual = async (id, nueva) => {
-                if (nueva < 0) return;
-                await supabase.from('herramientas').update({ cantidad: nueva }).eq('id', id);
+                await supabase.from('herramientas').update({ cantidad: nuevaCant }).eq('id', herramienta.id);
+                await supabase.from('pedidos').delete().eq('id', pedido.id);
+                
+                alert("Entregado y descontado.");
                 cargarDatos();
+                cargarPedidos();
             };
 
             const herramientasFiltradas = useMemo(() => {
                 return herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase()));
             }, [busqueda, herramientas]);
 
-            if (cargando) return <div className="h-screen flex items-center justify-center font-black text-orange-500 text-3xl animate-pulse">SISTEMA DE INVENTARIO...</div>;
-
             return (
-                <div className="max-w-6xl mx-auto p-4 lg:p-10">
-                    <nav className="flex justify-between items-center mb-8 bg-slate-800 p-6 rounded-[2rem] border border-slate-700 shadow-2xl">
-                        <div>
-                            <h1 className="text-2xl font-black text-orange-500 italic tracking-tighter">MASTER STOCK PRO</h1>
-                            <p className="text-[10px] font-bold text-slate-400">STATUS: {isAdmin ? "ADMINISTRADOR" : "USUARIO"}</p>
-                        </div>
-                        <div className="flex gap-3">
+                <div className="max-w-6xl mx-auto p-4">
+                    <nav className="flex justify-between items-center mb-8 bg-slate-800 p-6 rounded-3xl border border-slate-700">
+                        <h1 className="text-2xl font-black text-orange-500 italic">STOCK MASTER</h1>
+                        <div className="flex gap-2">
                             {isAdmin && (
-                                <button onClick={() => setVerPedidos(!verPedidos)} className="relative bg-blue-600 px-5 py-2 rounded-2xl text-xs font-black shadow-lg shadow-blue-900/40">
-                                    {verPedidos ? '📦 VER STOCK' : `📥 SOLICITUDES`}
-                                    {pedidos.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 w-6 h-6 rounded-full flex items-center justify-center text-[10px] animate-bounce">{pedidos.length}</span>}
+                                <button onClick={() => setVerPedidos(!verPedidos)} className="bg-blue-600 px-4 py-2 rounded-xl text-xs font-bold uppercase">
+                                    {verPedidos ? 'Ver Stock' : `Pedidos (${pedidos.length})`}
                                 </button>
                             )}
-                            <button onClick={isAdmin ? () => setIsAdmin(false) : () => setMostrarLogin(true)} className="bg-slate-700 px-5 py-2 rounded-2xl text-xs font-black">
-                                {isAdmin ? 'SALIR' : 'ACCESO ADMIN'}
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="bg-slate-700 px-4 py-2 rounded-xl text-xs font-bold uppercase">
+                                {isAdmin ? 'Salir' : 'Admin'}
                             </button>
                         </div>
                     </nav>
 
                     {mostrarLogin && (
-                        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-6">
-                            <div className="bg-slate-800 p-10 rounded-[3rem] w-full max-w-sm border-2 border-orange-500">
-                                <h2 className="text-2xl font-black mb-6 text-center">LOGIN ADMIN</h2>
-                                <input type="password" placeholder="CLAVE" autoFocus className="w-full p-4 bg-slate-900 rounded-2xl mb-6 outline-none border border-slate-700 focus:border-orange-500 text-center text-2xl font-bold" value={passInput} onChange={e => setPassInput(e.target.value)} />
-                                <button onClick={handleLogin} className="w-full bg-orange-600 py-4 rounded-2xl font-black text-xl hover:scale-105 transition-transform">ENTRAR</button>
+                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-6">
+                            <div className="bg-slate-800 p-8 rounded-3xl w-full max-w-sm border border-orange-500">
+                                <h2 className="text-xl font-bold mb-4 text-center tracking-widest uppercase">Password Admin</h2>
+                                <input type="password" autoFocus className="w-full p-4 bg-slate-900 rounded-xl mb-4 text-center text-2xl border border-slate-700 outline-none" onChange={e => setPassInput(e.target.value)} />
+                                <button onClick={() => { if(passInput === ADMIN_PASSWORD) { setIsAdmin(true); setMostrarLogin(false); } else alert("Error"); }} className="w-full bg-orange-600 py-4 rounded-xl font-bold">ENTRAR</button>
                             </div>
                         </div>
                     )}
 
-                    {verPedidos && isAdmin ? (
-                        <div className="animate-in fade-in slide-in-from-bottom-5">
-                            <h2 className="text-3xl font-black mb-8 text-blue-400">PEDIDOS POR ENTREGAR</h2>
-                            <div className="space-y-4">
-                                {pedidos.length > 0 ? pedidos.map(p => (
-                                    <div key={p.id} className="bg-slate-800 border border-slate-700 p-6 rounded-[2rem] flex flex-col md:flex-row justify-between items-center gap-6 shadow-xl">
-                                        <div className="text-center md:text-left">
-                                            <p className="text-orange-500 font-black text-2xl uppercase">{p.herramienta_nombre}</p>
-                                            <p className="text-white font-bold text-lg">Cantidad solicitada: <span className="text-blue-400">{p.cantidad_pedida} unidades</span></p>
-                                            <p className="text-slate-400 italic">Pedido por: {p.usuario_nombre} | Tarea: {p.tarea}</p>
-                                        </div>
-                                        <div className="flex gap-3 w-full md:w-auto">
-                                            <button onClick={() => procesarEntrega(p)} className="flex-1 bg-green-600 px-8 py-4 rounded-2xl font-black text-xs uppercase hover:bg-green-500 transition-all">✓ ENTREGAR Y RESTAR STOCK</button>
-                                            <button onClick={() => eliminarPedido(p.id)} className="bg-red-600/20 text-red-500 px-4 rounded-2xl font-bold text-xs uppercase border border-red-500/30">✕</button>
-                                        </div>
-                                    </div>
-                                )) : <div className="text-center py-20 text-slate-500 text-2xl italic font-bold">Sin solicitudes pendientes.</div>}
-                            </div>
-                        </div>
-                    ) : (
+                    {!verPedidos ? (
                         <>
-                            <div className="mb-10">
-                                <input type="text" placeholder="🔍 BUSCAR MATERIAL..." className="w-full bg-slate-800 p-6 rounded-3xl border border-slate-700 outline-none focus:border-orange-500 text-xl font-bold shadow-inner" onChange={e => setBusqueda(e.target.value)} />
+                            <div className="flex gap-4 mb-8">
+                                <input type="text" placeholder="Buscar..." className="flex-1 bg-slate-800 p-4 rounded-2xl outline-none" onChange={e => setBusqueda(e.target.value)} />
+                                {isAdmin && <button onClick={() => setMostrarAdd(!mostrarAdd)} className="bg-green-600 px-6 rounded-2xl font-bold text-2xl">+</button>}
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {herramientasFiltradas.map(h => (
-                                    <div key={h.id} className={`bg-slate-800 rounded-[3rem] overflow-hidden border border-slate-700 flex flex-col hover:border-orange-500 transition-all ${h.cantidad === 0 ? 'agotado' : ''} ${isAdmin ? 'admin-border' : ''} shadow-xl`}>
-                                        <div className="h-56 bg-black/40 p-4">
-                                            <img src={h.foto_url} className="w-full h-full object-contain" />
-                                        </div>
-                                        <div className="p-8 flex-grow flex flex-col">
-                                            <div className="flex justify-between items-start mb-6">
-                                                <h4 className="text-2xl font-black uppercase leading-none tracking-tighter">{h.nombre}</h4>
-                                                <div className={`px-4 py-2 rounded-2xl font-black text-sm ${h.cantidad > 0 ? 'bg-orange-600 text-white' : 'bg-red-600 text-white animate-pulse'}`}>
-                                                    {h.cantidad > 0 ? `STOCK: ${h.cantidad}` : 'AGOTADO'}
-                                                </div>
-                                            </div>
+                            {isAdmin && mostrarAdd && (
+                                <div className="bg-slate-800 p-6 rounded-3xl mb-8 border-2 border-green-600">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                        <input type="text" placeholder="Nombre" className="bg-slate-900 p-3 rounded-xl" onChange={e => setForm({...form, nombre: e.target.value})} />
+                                        <input type="number" placeholder="Stock" className="bg-slate-900 p-3 rounded-xl" onChange={e => setForm({...form, cantidad: e.target.value})} />
+                                        <input type="text" placeholder="Lugar" className="bg-slate-900 p-3 rounded-xl" onChange={e => setForm({...form, lugar: e.target.value})} />
+                                    </div>
+                                    <input type="file" className="mb-4 block text-xs" onChange={e => setForm({...form, foto: e.target.files[0]})} />
+                                    <button onClick={guardarNuevoMaterial} disabled={enviando} className="w-full bg-green-600 py-3 rounded-xl font-bold">{enviando ? 'Subiendo...' : 'Confirmar Registro'}</button>
+                                </div>
+                            )}
 
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {herramientasFiltradas.map(h => (
+                                    <div key={h.id} className={`bg-slate-800 rounded-3xl overflow-hidden border border-slate-700 flex flex-col ${h.cantidad === 0 ? 'agotado' : ''} ${isAdmin ? 'admin-border' : ''}`}>
+                                        <div className="h-48 bg-black/40 p-2"><img src={h.foto_url} className="w-full h-full object-contain" /></div>
+                                        <div className="p-5 flex-grow flex flex-col uppercase font-bold">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <h4 className="text-sm">{h.nombre}</h4>
+                                                <span className="bg-orange-600 px-2 py-1 rounded text-[10px]">{h.cantidad}</span>
+                                            </div>
                                             {isAdmin ? (
-                                                <div className="flex items-center justify-between bg-slate-900 p-3 rounded-2xl mt-auto">
-                                                    <button onClick={() => actualizarStockManual(h.id, h.cantidad - 1)} className="w-14 h-14 bg-slate-700 rounded-xl font-black text-3xl hover:bg-red-600">-</button>
-                                                    <span className="font-black text-3xl text-orange-500">{h.cantidad}</span>
-                                                    <button onClick={() => actualizarStockManual(h.id, h.cantidad + 1)} className="w-14 h-14 bg-slate-700 rounded-xl font-black text-3xl hover:bg-green-600">+</button>
+                                                <div className="flex justify-between items-center bg-slate-900 p-2 rounded-xl mt-auto">
+                                                    <button onClick={async () => { await supabase.from('herramientas').update({cantidad: h.cantidad - 1}).eq('id', h.id); cargarDatos(); }} className="w-10 h-10 bg-slate-700 rounded-lg">-</button>
+                                                    <span>{h.cantidad}</span>
+                                                    <button onClick={async () => { await supabase.from('herramientas').update({cantidad: h.cantidad + 1}).eq('id', h.id); cargarDatos(); }} className="w-10 h-10 bg-slate-700 rounded-lg">+</button>
                                                 </div>
                                             ) : (
-                                                <button onClick={() => enviarSolicitud(h)} disabled={h.cantidad === 0} className="mt-auto w-full bg-blue-600 disabled:bg-slate-800 py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-lg shadow-blue-900/40 active:scale-95 transition-all">
-                                                    {h.cantidad > 0 ? '🚀 SOLICITAR AHORA' : 'MATERIAL AGOTADO'}
-                                                </button>
+                                                <button onClick={async () => {
+                                                    const n = prompt("Tu nombre:");
+                                                    const t = prompt("Tarea:");
+                                                    const c = prompt("Cantidad:");
+                                                    if(n && t && c) {
+                                                        await supabase.from('pedidos').insert([{ herramienta_id: h.id, herramienta_nombre: h.nombre, usuario_nombre: n, tarea: t, cantidad_pedida: parseInt(c) }]);
+                                                        alert("Pedido enviado");
+                                                        cargarPedidos();
+                                                    }
+                                                }} disabled={h.cantidad === 0} className="mt-auto w-full bg-blue-600 py-3 rounded-xl text-xs">SOLICITAR</button>
                                             )}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </>
+                    ) : (
+                        <div className="grid gap-4">
+                            <h2 className="text-xl font-bold text-blue-400">PEDIDOS PENDIENTES</h2>
+                            {pedidos.map(p => (
+                                <div key={p.id} className="bg-slate-800 p-6 rounded-3xl border border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                                    <div className="text-center md:text-left uppercase">
+                                        <p className="text-orange-500 font-bold">{p.herramienta_nombre} x{p.cantidad_pedida}</p>
+                                        <p className="text-xs text-slate-400">{p.usuario_nombre} - {p.tarea}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => procesarEntrega(p)} className="bg-green-600 px-4 py-2 rounded-xl font-bold text-[10px]">ENTREGAR Y RESTAR</button>
+                                        <button onClick={async () => { await supabase.from('pedidos').delete().eq('id', p.id); cargarPedidos(); }} className="bg-red-600 px-4 py-2 rounded-xl font-bold text-[10px]">ELIMINAR</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
             );
