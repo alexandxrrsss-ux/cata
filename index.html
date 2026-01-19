@@ -11,8 +11,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { background-color: #0f172a; color: white; font-family: 'Inter', sans-serif; }
-        .admin-mode { border: 2px solid #f97316; }
-        .stock-bajo { border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .admin-mode { border: 2px solid #f97316 !important; }
+        .stock-critico { border: 2px solid #ef4444 !important; background: rgba(239, 68, 68, 0.1); }
         .agotado { filter: grayscale(1); opacity: 0.5; }
         .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); }
     </style>
@@ -39,7 +39,7 @@
             const [editandoId, setEditandoId] = useState(null);
             const [passInput, setPassInput] = useState('');
             const [enviando, setEnviando] = useState(false);
-            const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto: null });
+            const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto: null, foto_url: '' });
 
             useEffect(() => { cargarDatos(); cargarPedidos(); }, []);
 
@@ -68,7 +68,7 @@
                             canvas.height = img.height * scale;
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.7);
+                            canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.6);
                         };
                     };
                 });
@@ -96,47 +96,49 @@
                     };
 
                     if (editandoId) {
-                        await supabase.from('herramientas').update(payload).eq('id', editandoId);
-                        alert("✅ Actualizado");
+                        const { error } = await supabase.from('herramientas').update(payload).eq('id', editandoId);
+                        if (error) throw error;
                     } else {
-                        await supabase.from('herramientas').insert([payload]);
-                        alert("✅ Registrado");
+                        const { error } = await supabase.from('herramientas').insert([payload]);
+                        if (error) throw error;
                     }
 
-                    setForm({ nombre: '', cantidad: '', lugar: '', foto: null });
+                    setForm({ nombre: '', cantidad: '', lugar: '', foto: null, foto_url: '' });
                     setMostrarForm(false);
                     setEditandoId(null);
                     cargarDatos();
+                    alert("✅ Proceso completado");
                 } catch (err) { alert(err.message); } finally { setEnviando(false); }
             };
 
-            const iniciarEdicion = (h) => {
+            const prepararEdicion = (h) => {
                 setForm({ nombre: h.nombre, cantidad: h.cantidad, lugar: h.lugar, foto_url: h.foto_url });
                 setEditandoId(h.id);
                 setMostrarForm(true);
+                window.scrollTo(0, 0);
             };
 
             const entregar = async (p) => {
                 const h = herramientas.find(item => item.id === p.herramienta_id);
-                if (!h) return alert("Material no encontrado");
+                if (!h) return alert("Material no existe");
                 const nuevaCant = h.cantidad - p.cantidad_pedida;
-                if (nuevaCant < 0) return alert("Stock insuficiente");
+                if (nuevaCant < 0) return alert("No hay suficiente");
                 await supabase.from('herramientas').update({ cantidad: nuevaCant }).eq('id', h.id);
                 await supabase.from('pedidos').delete().eq('id', p.id);
                 cargarDatos(); cargarPedidos();
             };
 
-            const stockBajo = useMemo(() => herramientas.filter(h => h.cantidad <= 3 && h.cantidad > 0), [herramientas]);
-            const agotados = useMemo(() => herramientas.filter(h => h.cantidad === 0), [herramientas]);
+            const stockCritico = useMemo(() => herramientas.filter(h => h.cantidad <= 3), [herramientas]);
 
             return (
                 <div className="max-w-6xl mx-auto p-4 lg:p-8">
+                    {/* BARRA SUPERIOR */}
                     <nav className="flex justify-between items-center mb-8 glass p-6 rounded-[2rem] border border-slate-700 shadow-xl sticky top-4 z-40">
                         <h1 className="text-xl font-black text-orange-500 italic uppercase">Stock Master v4</h1>
                         <div className="flex gap-2">
                             {isAdmin && (
                                 <button onClick={() => setVerPedidos(!verPedidos)} className="bg-blue-600 px-4 py-2 rounded-xl text-[10px] font-bold">
-                                    {verPedidos ? '📦 STOCK' : `📥 PEDIDOS (${pedidos.length})`}
+                                    {verPedidos ? '📦 VER STOCK' : `📥 PEDIDOS (${pedidos.length})`}
                                 </button>
                             )}
                             <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="bg-slate-700 px-4 py-2 rounded-xl text-[10px] font-bold uppercase">
@@ -149,20 +151,20 @@
                         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
                             <div className="bg-slate-800 p-8 rounded-[2.5rem] border border-orange-500 w-full max-w-xs text-center">
                                 <input type="password" placeholder="Clave" className="w-full p-4 bg-slate-900 rounded-2xl mb-4 text-center text-xl outline-none" onChange={e => setPassInput(e.target.value)} />
-                                <button onClick={() => {if(passInput===ADMIN_PASSWORD) {setIsAdmin(true); setMostrarLogin(false);}}} className="w-full bg-orange-600 py-3 rounded-2xl font-bold">ENTRAR</button>
+                                <button onClick={() => {if(passInput===ADMIN_PASSWORD) {setIsAdmin(true); setMostrarLogin(false);}}} className="w-full bg-orange-600 py-3 rounded-2xl font-bold uppercase tracking-widest">Entrar</button>
                             </div>
                         </div>
                     )}
 
                     {!verPedidos ? (
                         <>
-                            {/* SECCIÓN STOCK BAJO (SOLO ADMIN) */}
-                            {isAdmin && (stockBajo.length > 0 || agotados.length > 0) && (
-                                <div className="mb-8 p-6 bg-red-900/20 border-2 border-red-500/50 rounded-[2rem] animate-pulse">
-                                    <h3 className="text-red-500 font-black mb-4 uppercase text-sm flex items-center gap-2">⚠️ Alerta de Reabastecimiento</h3>
+                            {/* ALERTA DE STOCK BAJO (SOLO ADMIN) */}
+                            {isAdmin && stockCritico.length > 0 && (
+                                <div className="mb-8 p-4 bg-red-900/20 border-2 border-red-500 rounded-3xl">
+                                    <h3 className="text-red-500 font-black mb-2 uppercase text-xs tracking-widest flex items-center gap-2">⚠️ Reponer Urgente:</h3>
                                     <div className="flex flex-wrap gap-2">
-                                        {[...stockBajo, ...agotados].map(h => (
-                                            <span key={h.id} className="bg-red-600 px-3 py-1 rounded-lg text-[10px] font-bold uppercase">
+                                        {stockCritico.map(h => (
+                                            <span key={h.id} className="bg-red-600 text-white px-3 py-1 rounded-lg text-[10px] font-bold">
                                                 {h.nombre} ({h.cantidad})
                                             </span>
                                         ))}
@@ -171,59 +173,68 @@
                             )}
 
                             <div className="flex gap-4 mb-10">
-                                <input type="text" placeholder="¿Qué buscas?" className="flex-1 bg-slate-800 p-5 rounded-3xl outline-none border border-slate-700 text-lg" onChange={e => setBusqueda(e.target.value)} />
+                                <input type="text" placeholder="Buscar herramienta..." className="flex-1 bg-slate-800 p-5 rounded-3xl outline-none border border-slate-700 text-lg" onChange={e => setBusqueda(e.target.value)} />
                                 {isAdmin && (
-                                    <button onClick={() => { setEditandoId(null); setForm({nombre:'',cantidad:'',lugar:'',foto:null}); setMostrarForm(!mostrarForm); }} className="bg-green-600 px-8 rounded-3xl font-black text-2xl">
+                                    <button onClick={() => { setEditandoId(null); setForm({nombre:'',cantidad:'',lugar:'',foto:null, foto_url:''}); setMostrarForm(!mostrarForm); }} className="bg-green-600 px-8 rounded-3xl font-black text-2xl">
                                         {mostrarForm ? '✕' : '+'}
                                     </button>
                                 )}
                             </div>
 
                             {isAdmin && mostrarForm && (
-                                <div className="bg-slate-800 p-8 rounded-[2.5rem] border-2 border-green-600 mb-10 shadow-2xl animate-in zoom-in duration-200">
-                                    <h2 className="text-green-500 font-black mb-6 uppercase">{editandoId ? 'Editar Material' : 'Nuevo Material'}</h2>
+                                <div className="bg-slate-800 p-8 rounded-[2.5rem] border-2 border-green-600 mb-10 shadow-2xl animate-in slide-in-from-top-4 duration-300">
+                                    <h2 className="text-green-500 font-black mb-6 uppercase tracking-widest">{editandoId ? '🛠️ Editando Material' : '🆕 Nuevo Registro'}</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                                        <input type="text" placeholder="Nombre" className="bg-slate-900 p-4 rounded-2xl border border-slate-700" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
-                                        <input type="number" placeholder="Cantidad" className="bg-slate-900 p-4 rounded-2xl border border-slate-700" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} />
-                                        <input type="text" placeholder="Ubicación" className="bg-slate-900 p-4 rounded-2xl border border-slate-700" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 ml-2 uppercase">Nombre</label>
+                                            <input type="text" className="w-full bg-slate-900 p-4 rounded-2xl border border-slate-700" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 ml-2 uppercase">Cantidad</label>
+                                            <input type="number" className="w-full bg-slate-900 p-4 rounded-2xl border border-slate-700" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-slate-400 ml-2 uppercase">Lugar</label>
+                                            <input type="text" className="w-full bg-slate-900 p-4 rounded-2xl border border-slate-700" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                        </div>
                                     </div>
                                     <input type="file" className="mb-6 block text-sm" onChange={e => setForm({...form, foto: e.target.files[0]})} />
-                                    <button onClick={guardarMaterial} disabled={enviando} className="w-full bg-green-600 py-4 rounded-2xl font-black uppercase">
-                                        {enviando ? 'PROCESANDO...' : 'GUARDAR CAMBIOS'}
+                                    <button onClick={guardarMaterial} disabled={enviando} className="w-full bg-green-600 py-4 rounded-2xl font-black uppercase tracking-widest disabled:opacity-50">
+                                        {enviando ? 'SUBIENDO EN ALTA VELOCIDAD...' : 'CONFIRMAR DATOS'}
                                     </button>
                                 </div>
                             )}
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                                 {herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase())).map(h => (
-                                    <div key={h.id} className={`bg-slate-800 rounded-[2.5rem] overflow-hidden border border-slate-700 flex flex-col shadow-xl transition-all ${h.cantidad === 0 ? 'agotado' : h.cantidad <= 3 ? 'stock-bajo' : ''} ${isAdmin ? 'admin-mode' : ''}`}>
-                                        <div className="h-52 bg-black/40 p-4 relative">
+                                    <div key={h.id} className={`bg-slate-800 rounded-[2.5rem] overflow-hidden border border-slate-700 flex flex-col shadow-xl transition-all ${h.cantidad === 0 ? 'agotado' : h.cantidad <= 3 ? 'stock-critico' : ''} ${isAdmin ? 'admin-mode' : ''}`}>
+                                        <div className="h-48 bg-black/40 p-4 relative">
                                             <img src={h.foto_url} className="w-full h-full object-contain" alt={h.nombre} />
-                                            {h.cantidad <= 3 && h.cantidad > 0 && <span className="absolute top-4 right-4 bg-red-600 text-[9px] font-black px-2 py-1 rounded">POCO STOCK</span>}
+                                            {h.cantidad <= 3 && h.cantidad > 0 && <span className="absolute top-4 right-4 bg-red-600 text-[10px] font-bold px-2 py-1 rounded-lg">REBAJADO</span>}
                                         </div>
                                         <div className="p-7 flex flex-col flex-grow">
                                             <div className="flex justify-between items-start mb-2">
                                                 <h4 className="text-lg font-black uppercase leading-tight">{h.nombre}</h4>
-                                                <span className={`px-3 py-1 rounded-xl font-black text-xs ${h.cantidad > 0 ? 'bg-orange-600' : 'bg-red-600 animate-pulse'}`}>CANT: {h.cantidad}</span>
+                                                <span className={`px-3 py-1 rounded-xl font-black text-[10px] ${h.cantidad > 0 ? 'bg-orange-600' : 'bg-red-600 animate-pulse'}`}>STOCK: {h.cantidad}</span>
                                             </div>
-                                            <p className="text-xs text-slate-400 font-bold mb-6 italic">📍 {h.lugar || 'S/U'}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold mb-6 italic uppercase flex items-center gap-1">📍 {h.lugar || 'Sin Ubicación'}</p>
                                             
                                             {isAdmin ? (
-                                                <div className="mt-auto flex flex-col gap-2">
-                                                    <div className="flex justify-between items-center bg-slate-900 p-3 rounded-2xl">
+                                                <div className="mt-auto space-y-2">
+                                                    <div className="flex justify-between items-center bg-slate-900 p-2 rounded-2xl">
                                                         <button onClick={async () => { await supabase.from('herramientas').update({cantidad: Math.max(0, h.cantidad - 1)}).eq('id', h.id); cargarDatos(); }} className="w-10 h-10 bg-slate-700 rounded-xl font-bold">-</button>
                                                         <span className="font-black text-orange-500">{h.cantidad}</span>
                                                         <button onClick={async () => { await supabase.from('herramientas').update({cantidad: h.cantidad + 1}).eq('id', h.id); cargarDatos(); }} className="w-10 h-10 bg-slate-700 rounded-xl font-bold">+</button>
                                                     </div>
                                                     <div className="flex gap-2">
-                                                        <button onClick={() => iniciarEdicion(h)} className="flex-1 py-2 bg-blue-600/20 text-blue-400 text-[10px] font-black uppercase border border-blue-500/20 rounded-xl">Editar</button>
-                                                        <button onClick={async () => { if(confirm("¿Borrar?")) { await supabase.from('herramientas').delete().eq('id', h.id); cargarDatos(); } }} className="flex-1 py-2 bg-red-600/20 text-red-400 text-[10px] font-black uppercase border border-red-500/20 rounded-xl">Borrar</button>
+                                                        <button onClick={() => prepararEdicion(h)} className="flex-1 py-3 bg-blue-600 font-black text-[10px] uppercase rounded-xl">EDITAR</button>
+                                                        <button onClick={async () => { if(confirm("¿Eliminar para siempre?")) { await supabase.from('herramientas').delete().eq('id', h.id); cargarDatos(); } }} className="flex-1 py-3 bg-slate-700 text-red-400 font-black text-[10px] uppercase rounded-xl">BORRAR</button>
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <button onClick={async () => {
                                                     const n = prompt("Tu nombre:");
-                                                    const t = prompt("¿Para qué?");
+                                                    const t = prompt("¿Para qué trabajo?");
                                                     const c = prompt("¿Cuántos?");
                                                     if(n && t && c) {
                                                         await supabase.from('pedidos').insert([{ 
@@ -232,9 +243,10 @@
                                                             usuario_nombre: n, 
                                                             tarea: t, 
                                                             cantidad_pedida: parseInt(c),
-                                                            foto_url: h.foto_url // GUARDAMOS LA FOTO EN EL PEDIDO
+                                                            foto_url: h.foto_url 
                                                         }]);
-                                                        alert("Enviado"); cargarPedidos();
+                                                        alert("🚀 Solicitud enviada al almacén");
+                                                        cargarPedidos();
                                                     }
                                                 }} disabled={h.cantidad === 0} className="mt-auto w-full bg-blue-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all">
                                                     {h.cantidad > 0 ? '🚀 Solicitar Material' : 'Agotado'}
@@ -248,23 +260,24 @@
                     ) : (
                         /* PEDIDOS CON FOTO */
                         <div className="space-y-4">
-                            <h2 className="text-2xl font-black text-blue-400 mb-8 uppercase italic">Pedidos Pendientes</h2>
+                            <h2 className="text-2xl font-black text-blue-400 mb-8 uppercase italic tracking-widest">Pedidos en Espera</h2>
                             {pedidos.map(p => (
                                 <div key={p.id} className="bg-slate-800 p-6 rounded-[2.5rem] border border-slate-700 flex flex-col md:flex-row items-center gap-6 shadow-xl">
-                                    <div className="w-24 h-24 bg-black/40 rounded-2xl overflow-hidden p-2 flex-shrink-0">
+                                    <div className="w-24 h-24 bg-black/40 rounded-2xl overflow-hidden p-2 flex-shrink-0 border border-slate-700">
                                         <img src={p.foto_url} className="w-full h-full object-contain" />
                                     </div>
-                                    <div className="flex-1 text-center md:text-left">
-                                        <p className="text-orange-500 font-black text-xl uppercase tracking-tighter">{p.herramienta_nombre} (x{p.cantidad_pedida})</p>
-                                        <p className="text-sm font-bold opacity-80 uppercase">{p.usuario_nombre} — {p.tarea}</p>
+                                    <div className="flex-1 text-center md:text-left uppercase">
+                                        <p className="text-orange-500 font-black text-xl tracking-tighter">{p.herramienta_nombre} (x{p.cantidad_pedida})</p>
+                                        <p className="text-[10px] font-bold opacity-80">PEDIDO POR: {p.usuario_nombre}</p>
+                                        <p className="text-[10px] italic text-slate-400">TRABAJO: {p.tarea}</p>
                                     </div>
                                     <div className="flex gap-2 w-full md:w-auto">
-                                        <button onClick={() => entregar(p)} className="flex-1 md:flex-none bg-green-600 px-6 py-4 rounded-2xl font-black text-xs uppercase shadow-lg shadow-green-900/20">✓ Entregar</button>
-                                        <button onClick={async () => { await supabase.from('pedidos').delete().eq('id', p.id); cargarPedidos(); }} className="bg-red-600/20 text-red-500 px-6 py-4 rounded-2xl font-black text-xs uppercase border border-red-500/10">Borrar</button>
+                                        <button onClick={() => entregar(p)} className="flex-1 md:flex-none bg-green-600 px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-lg shadow-green-900/40">Entregar</button>
+                                        <button onClick={async () => { await supabase.from('pedidos').delete().eq('id', p.id); cargarPedidos(); }} className="bg-red-600/10 text-red-500 px-6 py-4 rounded-2xl font-black text-[10px] uppercase border border-red-500/20">X</button>
                                     </div>
                                 </div>
                             ))}
-                            {pedidos.length === 0 && <p className="text-center py-20 text-slate-500 font-bold uppercase italic">Bandeja de entrada vacía</p>}
+                            {pedidos.length === 0 && <p className="text-center py-20 text-slate-500 font-bold uppercase italic tracking-widest">No hay pedidos pendientes</p>}
                         </div>
                     )}
                 </div>
