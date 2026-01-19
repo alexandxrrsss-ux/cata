@@ -3,211 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Elite v8 - Ultra Fast</title>
+    <title>StockMaster Elite v10 - Historial Full</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #0f172a; color: white; font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
-        .card-admin { border: 2px solid #f97316 !important; }
-        .card-bajo { border: 2px solid #ef4444 !important; }
-        input { transition: border 0.2s ease; }
+        body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .font-tech { font-family: 'Orbitron', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .neo-orange { border: 1px solid #f97316; box-shadow: 0 0 20px rgba(249, 115, 22, 0.2); }
+        .tab-active { background: #f97316 !important; color: white !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.4); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useCallback } = React;
+        const { useState, useEffect, useMemo } = React;
 
         const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const ADMIN_PASSWORD = "123"; 
 
-        const normalizar = (texto) => 
-            texto ? texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
+        const normalizar = (t) => t ? t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
         function App() {
             const [herramientas, setHerramientas] = useState([]);
             const [pedidos, setPedidos] = useState([]);
+            const [historial, setHistorial] = useState([]); // <--- NUEVO ESTADO
             const [busqueda, setBusqueda] = useState('');
             const [isAdmin, setIsAdmin] = useState(false);
             const [seccion, setSeccion] = useState('stock'); 
             const [mostrarLogin, setMostrarLogin] = useState(false);
-            const [mostrarForm, setMostrarForm] = useState(false);
-            const [editandoId, setEditandoId] = useState(null);
-            const [enviando, setEnviando] = useState(false);
-            
-            // Estado del formulario separado para evitar re-renders masivos
-            const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto: null, foto_url: '' });
+            const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto_url: '' });
 
-            useEffect(() => { cargarDatos(); cargarPedidos(); }, []);
+            useEffect(() => { fetchData(); }, []);
 
-            const cargarDatos = async () => {
-                const { data } = await supabase.from('herramientas').select('*').order('nombre', { ascending: true });
-                if (data) setHerramientas(data);
+            const fetchData = async () => {
+                const { data: h } = await supabase.from('herramientas').select('*').order('nombre');
+                const { data: p } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
+                const { data: hi } = await supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(50); 
+                if (h) setHerramientas(h);
+                if (p) setPedidos(p);
+                if (hi) setHistorial(hi);
             };
 
-            const cargarPedidos = async () => {
-                const { data } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
-                if (data) setPedidos(data);
-            };
-
-            const herramientasFiltradas = useMemo(() => {
+            const filtrarHerramientas = useMemo(() => {
                 const b = normalizar(busqueda);
-                return b === "" ? herramientas : herramientas.filter(h => normalizar(h.nombre).includes(b));
+                return herramientas.filter(h => normalizar(h.nombre).includes(b));
             }, [herramientas, busqueda]);
 
-            const stockBajo = useMemo(() => herramientas.filter(h => h.cantidad <= 3), [herramientas]);
+            // FUNCIÓN MEJORADA: Entregar y Guardar en Historial
+            const entregarPedido = async (p) => {
+                const mat = herramientas.find(h => h.id === p.herramienta_id);
+                if(!mat || mat.cantidad < p.cantidad_pedida) return alert("STOCK INSUFICIENTE");
 
-            const guardar = async () => {
-                if (!form.nombre || form.cantidad === '') return alert("Faltan datos");
-                setEnviando(true);
-                let urlFinal = form.foto_url || 'https://via.placeholder.com/400x300?text=Sin+Imagen';
+                // 1. Descontar del stock
+                await supabase.from('herramientas').update({ cantidad: mat.cantidad - p.cantidad_pedida }).eq('id', mat.id);
+                
+                // 2. Guardar en la tabla de HISTORIAL (Quién, Qué, Cuánto, Cuándo)
+                await supabase.from('historial').insert([{
+                    herramienta_nombre: p.herramienta_nombre,
+                    usuario: p.usuario_nombre,
+                    cantidad: p.cantidad_pedida,
+                    tarea: p.tarea,
+                    fecha: new Date().toISOString()
+                }]);
 
-                try {
-                    if (form.foto && typeof form.foto !== 'string') {
-                        const fileName = `${Date.now()}.jpg`;
-                        await supabase.storage.from('herramientas').upload(fileName, form.foto);
-                        const { data } = supabase.storage.from('herramientas').getPublicUrl(fileName);
-                        urlFinal = data.publicUrl;
-                    }
-                    const material = { nombre: form.nombre, cantidad: parseInt(form.cantidad), lugar: form.lugar, foto_url: urlFinal };
-                    if (editandoId) await supabase.from('herramientas').update(material).eq('id', editandoId);
-                    else await supabase.from('herramientas').insert([material]);
-                    
-                    setForm({ nombre: '', cantidad: '', lugar: '', foto: null, foto_url: '' });
-                    setEditandoId(null); setMostrarForm(false);
-                    cargarDatos();
-                } catch (e) { alert(e.message); } finally { setEnviando(false); }
+                // 3. Borrar de la lista de pendientes
+                await supabase.from('pedidos').delete().eq('id', p.id);
+                
+                fetchData();
+                alert("✓ Entrega registrada en el historial");
             };
 
-            // Componente de Tarjeta optimizado
-            const Tarjeta = useCallback(({ h }) => (
-                <div className={`glass rounded-[2rem] overflow-hidden flex flex-col shadow-xl ${h.cantidad <= 3 ? 'card-bajo' : ''} ${isAdmin ? 'card-admin' : ''}`}>
-                    <div className="h-40 bg-black/20 p-4">
-                        <img src={h.foto_url} className="w-full h-full object-contain" loading="lazy" />
-                    </div>
-                    <div className="p-5 flex flex-col flex-grow">
-                        <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-bold uppercase text-sm">{h.nombre}</h3>
-                            <span className={`text-[10px] px-2 py-1 rounded font-black ${h.cantidad > 0 ? 'bg-orange-600' : 'bg-red-700'}`}>{h.cantidad}</span>
-                        </div>
-                        <p className="text-[9px] text-slate-400 mb-4 uppercase italic">📍 {h.lugar || 'S/N'}</p>
-                        {isAdmin ? (
-                            <div className="mt-auto flex gap-2">
-                                <button onClick={() => {
-                                    setForm({ nombre: h.nombre, cantidad: h.cantidad, lugar: h.lugar, foto_url: h.foto_url });
-                                    setEditandoId(h.id); setMostrarForm(true); window.scrollTo(0,0);
-                                }} className="flex-1 bg-blue-600 py-2 rounded-lg text-[9px] font-bold uppercase">Editar</button>
-                                <button onClick={async () => { if(confirm("¿Borrar?")) { await supabase.from('herramientas').delete().eq('id', h.id); cargarDatos(); } }} className="bg-slate-700 px-3 rounded-lg text-red-500 font-bold">✕</button>
-                            </div>
-                        ) : (
-                            <button onClick={async () => {
-                                const n = prompt("Nombre:"); const t = prompt("Tarea:"); const c = prompt("Cantidad:");
-                                if(n && t && c) {
-                                    await supabase.from('pedidos').insert([{ herramienta_id: h.id, herramienta_nombre: h.nombre, usuario_nombre: n, tarea: t, cantidad_pedida: parseInt(c), foto_url: h.foto_url }]);
-                                    alert("Enviado"); cargarPedidos();
-                                }
-                            }} disabled={h.cantidad <= 0} className="mt-auto w-full bg-blue-600 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
-                                Solicitar
-                            </button>
-                        )}
-                    </div>
-                </div>
-            ), [isAdmin]);
-
             return (
-                <div className="max-w-6xl mx-auto p-4 lg:p-10">
-                    <nav className="glass p-4 rounded-[2rem] mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center font-black">S</div>
-                            <h1 className="font-black uppercase tracking-tighter">StockMaster <span className="text-orange-500">Elite</span></h1>
-                        </div>
-                        <div className="flex gap-2">
+                <div className="min-h-screen p-4 md:p-8">
+                    <header className="max-w-7xl mx-auto mb-8 text-center">
+                        <h1 className="text-3xl font-black font-tech mb-6 tracking-tighter">STOCK<span className="text-orange-500">MASTER</span> v10</h1>
+                        
+                        <div className="flex flex-wrap justify-center gap-2 bg-slate-900/80 p-2 rounded-2xl glass max-w-fit mx-auto">
+                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
                             {isAdmin && (
                                 <>
-                                    <button onClick={() => setSeccion('stock')} className={`px-4 py-2 rounded-xl text-[9px] font-bold ${seccion === 'stock' ? 'bg-orange-600' : 'bg-slate-800'}`}>STOCK</button>
-                                    <button onClick={() => setSeccion('pedidos')} className={`px-4 py-2 rounded-xl text-[9px] font-bold ${seccion === 'pedidos' ? 'bg-blue-600' : 'bg-slate-800'}`}>PEDIDOS</button>
-                                    <button onClick={() => setSeccion('bajo')} className={`px-4 py-2 rounded-xl text-[9px] font-bold ${seccion === 'bajo' ? 'bg-red-600' : 'bg-slate-800'}`}>STOCK BAJO</button>
+                                    <button onClick={() => setSeccion('pedidos')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({pedidos.length})</button>
+                                    <button onClick={() => setSeccion('historial')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
                                 </>
                             )}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-4 py-2 bg-slate-700 rounded-xl text-[9px] font-bold">
-                                {isAdmin ? 'SALIR' : 'ADMIN'}
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-5 py-2 rounded-xl text-[10px] font-black bg-slate-800 border border-slate-700 uppercase">
+                                {isAdmin ? 'Salir' : 'Admin'}
                             </button>
                         </div>
-                    </nav>
+                    </header>
 
-                    {seccion === 'stock' && (
-                        <div>
-                            <div className="flex gap-2 mb-8">
-                                <input 
-                                    type="text" 
-                                    placeholder="Buscar..." 
-                                    className="flex-1 bg-slate-800/60 p-4 rounded-2xl outline-none border border-transparent focus:border-orange-500"
-                                    value={busqueda}
-                                    onChange={e => setBusqueda(e.target.value)} 
-                                />
-                                {isAdmin && (
-                                    <button onClick={() => setMostrarForm(!mostrarForm)} className="bg-green-600 px-6 rounded-2xl font-black text-xl">+</button>
-                                )}
-                            </div>
-
-                            {isAdmin && mostrarForm && (
-                                <div className="bg-slate-800 p-6 rounded-[2rem] border border-green-600 mb-8">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                        <input type="text" placeholder="Nombre" className="bg-slate-900 p-3 rounded-xl border border-slate-700" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
-                                        <input type="number" placeholder="Cantidad" className="bg-slate-900 p-3 rounded-xl border border-slate-700" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} />
-                                        <input type="text" placeholder="Lugar" className="bg-slate-900 p-3 rounded-xl border border-slate-700" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
-                                    </div>
-                                    <button onClick={guardar} className="w-full bg-green-600 py-3 rounded-xl font-bold uppercase text-xs">Guardar Material</button>
+                    <main className="max-w-7xl mx-auto">
+                        {/* SECCIÓN INVENTARIO */}
+                        {seccion === 'stock' && (
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                <div className="col-span-full mb-6 relative">
+                                    <input type="text" placeholder="Buscar..." className="w-full bg-slate-900 p-4 rounded-2xl border border-slate-800 outline-none focus:border-orange-500" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-4 top-4 text-orange-500 font-bold">✕</button>}
                                 </div>
-                            )}
-
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {herramientasFiltradas.map(h => <Tarjeta key={h.id} h={h} />)}
-                            </div>
-                        </div>
-                    )}
-
-                    {seccion === 'bajo' && isAdmin && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {stockBajo.map(h => <Tarjeta key={h.id} h={h} />)}
-                        </div>
-                    )}
-
-                    {seccion === 'pedidos' && isAdmin && (
-                        <div className="space-y-4">
-                            {pedidos.map(p => (
-                                <div key={p.id} className="glass p-4 rounded-[1.5rem] flex items-center gap-4">
-                                    <img src={p.foto_url} className="w-16 h-16 object-contain bg-black/20 rounded-lg" />
-                                    <div className="flex-1">
-                                        <h4 className="font-bold text-orange-500 text-sm">{p.herramienta_nombre} (x{p.cantidad_pedida})</h4>
-                                        <p className="text-[10px] text-slate-400">Por: {p.usuario_nombre}</p>
+                                {filtrarHerramientas.map(h => (
+                                    <div key={h.id} className={`glass p-4 rounded-[2rem] flex flex-col ${h.cantidad <= 3 ? 'border-red-500/50 border' : ''}`}>
+                                        <img src={h.foto_url} className="h-32 w-full object-contain mb-4" />
+                                        <h3 className="font-bold text-[11px] uppercase truncate">{h.nombre}</h3>
+                                        <p className="text-[14px] font-tech text-orange-500 mb-4">{h.cantidad} UNI</p>
+                                        {!isAdmin && (
+                                            <button onClick={async () => {
+                                                const n = prompt("Tu nombre:"); const t = prompt("Tarea:"); const c = prompt("Cantidad:");
+                                                if(n && t && c) await supabase.from('pedidos').insert([{ herramienta_id: h.id, herramienta_nombre: h.nombre, usuario_nombre: n, tarea: t, cantidad_pedida: parseInt(c), foto_url: h.foto_url }]);
+                                                fetchData();
+                                            }} className="mt-auto bg-orange-600 py-2 rounded-xl text-[9px] font-black uppercase">Solicitar</button>
+                                        )}
                                     </div>
-                                    <button onClick={async () => {
-                                        const mat = herramientas.find(h => h.id === p.herramienta_id);
-                                        if(mat && mat.cantidad >= p.cantidad_pedida) {
-                                            await supabase.from('herramientas').update({ cantidad: mat.cantidad - p.cantidad_pedida }).eq('id', mat.id);
-                                            await supabase.from('pedidos').delete().eq('id', p.id);
-                                            cargarDatos(); cargarPedidos();
-                                        }
-                                    }} className="bg-green-600 p-3 rounded-lg text-[10px] font-bold">OK</button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                ))}
+                            </div>
+                        )}
 
+                        {/* SECCIÓN PEDIDOS */}
+                        {seccion === 'pedidos' && (
+                            <div className="space-y-4">
+                                {pedidos.map(p => (
+                                    <div key={p.id} className="glass p-6 rounded-[2rem] flex items-center gap-6 border-l-4 border-l-blue-500">
+                                        <div className="flex-1">
+                                            <h4 className="text-xl font-black uppercase text-orange-500">{p.herramienta_nombre} x{p.cantidad_pedida}</h4>
+                                            <p className="text-xs font-bold text-slate-400">SOLICITA: {p.usuario_nombre} | TAREA: {p.tarea}</p>
+                                        </div>
+                                        <button onClick={() => entregarPedido(p)} className="bg-green-600 px-8 py-4 rounded-2xl font-black text-xs">ENTREGAR</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* SECCIÓN HISTORIAL (LA MEJORA QUE FALTABA) */}
+                        {seccion === 'historial' && (
+                            <div className="glass rounded-[2rem] overflow-hidden">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-900 text-slate-400 font-tech">
+                                        <tr>
+                                            <th className="p-4">FECHA</th>
+                                            <th className="p-4">MATERIAL</th>
+                                            <th className="p-4">USUARIO</th>
+                                            <th className="p-4">CANT.</th>
+                                            <th className="p-4">MOTIVO</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                        {historial.map(hi => (
+                                            <tr key={hi.id} className="hover:bg-slate-800/30 transition-colors">
+                                                <td className="p-4 text-slate-500">{new Date(hi.fecha).toLocaleString()}</td>
+                                                <td className="p-4 font-bold text-orange-500 uppercase">{hi.herramienta_nombre}</td>
+                                                <td className="p-4 font-bold uppercase">{hi.usuario}</td>
+                                                <td className="p-4 font-tech">{hi.cantidad}</td>
+                                                <td className="p-4 italic text-slate-400">{hi.tarea}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* LOGIN MODAL */}
                     {mostrarLogin && (
-                        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                            <div className="bg-slate-800 p-8 rounded-[2rem] border border-orange-500 w-full max-w-xs text-center">
-                                <input type="password" placeholder="CLAVE" className="w-full p-3 bg-slate-900 rounded-xl mb-4 text-center text-xl" 
-                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false))} />
-                                <button onClick={() => setMostrarLogin(false)} className="text-[10px] text-slate-500">CERRAR</button>
+                        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-6 z-50">
+                            <div className="glass p-10 rounded-[3rem] border border-orange-500 w-full max-w-sm text-center">
+                                <h2 className="font-tech text-xs mb-8 tracking-widest">PASSWORD ADMIN</h2>
+                                <input type="password" placeholder="••••" className="w-full bg-slate-900 p-4 rounded-2xl text-center text-2xl outline-none border border-slate-700" 
+                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), setSeccion('stock'))} />
+                                <button onClick={() => setMostrarLogin(false)} className="mt-6 text-[10px] text-slate-500 uppercase">Cerrar</button>
                             </div>
                         </div>
                     )}
