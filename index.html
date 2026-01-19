@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Elite v10 - Historial Full</title>
+    <title>StockMaster Pro v11</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -13,9 +13,10 @@
     <style>
         body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
         .font-tech { font-family: 'Orbitron', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
         .neo-orange { border: 1px solid #f97316; box-shadow: 0 0 20px rgba(249, 115, 22, 0.2); }
         .tab-active { background: #f97316 !important; color: white !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.4); }
+        input[type="number"]::-webkit-inner-spin-button { display: none; }
     </style>
 </head>
 <body>
@@ -34,19 +35,22 @@
         function App() {
             const [herramientas, setHerramientas] = useState([]);
             const [pedidos, setPedidos] = useState([]);
-            const [historial, setHistorial] = useState([]); // <--- NUEVO ESTADO
+            const [historial, setHistorial] = useState([]);
             const [busqueda, setBusqueda] = useState('');
             const [isAdmin, setIsAdmin] = useState(false);
             const [seccion, setSeccion] = useState('stock'); 
             const [mostrarLogin, setMostrarLogin] = useState(false);
-            const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto_url: '' });
+            const [modalPedido, setModalPedido] = useState(null); // Para el material seleccionado
+            const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', foto_url: '', foto: null });
+            const [pedidoForm, setPedidoForm] = useState({ usuario: '', tarea: '', cantidad: 1 });
+            const [cargando, setCargando] = useState(false);
 
             useEffect(() => { fetchData(); }, []);
 
             const fetchData = async () => {
                 const { data: h } = await supabase.from('herramientas').select('*').order('nombre');
                 const { data: p } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
-                const { data: hi } = await supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(50); 
+                const { data: hi } = await supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(50);
                 if (h) setHerramientas(h);
                 if (p) setPedidos(p);
                 if (hi) setHistorial(hi);
@@ -57,110 +61,192 @@
                 return herramientas.filter(h => normalizar(h.nombre).includes(b));
             }, [herramientas, busqueda]);
 
-            // FUNCIÓN MEJORADA: Entregar y Guardar en Historial
-            const entregarPedido = async (p) => {
-                const mat = herramientas.find(h => h.id === p.herramienta_id);
-                if(!mat || mat.cantidad < p.cantidad_pedida) return alert("STOCK INSUFICIENTE");
+            const handleGuardar = async () => {
+                if (!form.nombre || form.cantidad === '') return alert("Faltan campos");
+                setCargando(true);
+                let urlFinal = form.foto_url || 'https://via.placeholder.com/400?text=Sin+Imagen';
 
-                // 1. Descontar del stock
-                await supabase.from('herramientas').update({ cantidad: mat.cantidad - p.cantidad_pedida }).eq('id', mat.id);
-                
-                // 2. Guardar en la tabla de HISTORIAL (Quién, Qué, Cuánto, Cuándo)
+                try {
+                    if (form.foto) {
+                        const fileExt = form.foto.name.split('.').pop();
+                        const fileName = `${Math.random()}.${fileExt}`;
+                        await supabase.storage.from('herramientas').upload(fileName, form.foto);
+                        urlFinal = supabase.storage.from('herramientas').getPublicUrl(fileName).data.publicUrl;
+                    }
+
+                    const data = { nombre: form.nombre, cantidad: parseInt(form.cantidad), lugar: form.lugar, foto_url: urlFinal };
+                    
+                    if (form.id) {
+                        await supabase.from('herramientas').update(data).eq('id', form.id);
+                    } else {
+                        await supabase.from('herramientas').insert([data]);
+                    }
+                    
+                    setForm({ nombre: '', cantidad: '', lugar: '', foto_url: '', foto: null });
+                    fetchData();
+                    alert("✅ Guardado correctamente");
+                } catch (e) { alert("Error al guardar"); }
+                finally { setCargando(false); }
+            };
+
+            const enviarPedido = async () => {
+                if(!pedidoForm.usuario || !pedidoForm.tarea) return alert("Faltan datos");
+                await supabase.from('pedidos').insert([{
+                    herramienta_id: modalPedido.id,
+                    herramienta_nombre: modalPedido.nombre,
+                    usuario_nombre: pedidoForm.usuario,
+                    tarea: pedidoForm.tarea,
+                    cantidad_pedida: parseInt(pedidoForm.cantidad),
+                    foto_url: modalPedido.foto_url
+                }]);
+                setModalPedido(null);
+                setPedidoForm({ usuario: '', tarea: '', cantidad: 1 });
+                fetchData();
+                alert("🚀 Solicitud enviada al Admin");
+            };
+
+            const entregar = async (p) => {
+                const h = herramientas.find(item => item.id === p.herramienta_id);
+                if(!h || h.cantidad < p.cantidad_pedida) return alert("Stock insuficiente");
+
+                await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
                 await supabase.from('historial').insert([{
                     herramienta_nombre: p.herramienta_nombre,
                     usuario: p.usuario_nombre,
                     cantidad: p.cantidad_pedida,
-                    tarea: p.tarea,
-                    fecha: new Date().toISOString()
+                    tarea: p.tarea
                 }]);
-
-                // 3. Borrar de la lista de pendientes
                 await supabase.from('pedidos').delete().eq('id', p.id);
-                
                 fetchData();
-                alert("✓ Entrega registrada en el historial");
             };
 
             return (
                 <div className="min-h-screen p-4 md:p-8">
-                    <header className="max-w-7xl mx-auto mb-8 text-center">
-                        <h1 className="text-3xl font-black font-tech mb-6 tracking-tighter">STOCK<span className="text-orange-500">MASTER</span> v10</h1>
+                    <header className="max-w-7xl mx-auto mb-8 flex flex-col items-center">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-orange-600 rounded-xl flex items-center justify-center font-black shadow-lg">S</div>
+                            <h1 className="text-2xl font-black font-tech tracking-tighter uppercase">StockMaster <span className="text-orange-500 text-sm">PRO V11</span></h1>
+                        </div>
                         
-                        <div className="flex flex-wrap justify-center gap-2 bg-slate-900/80 p-2 rounded-2xl glass max-w-fit mx-auto">
-                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
+                        <div className="flex flex-wrap justify-center gap-2 bg-slate-900/80 p-2 rounded-2xl glass neo-orange">
+                            <button onClick={() => setSeccion('stock')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'stock' ? 'tab-active' : ''}`}>Inventario</button>
                             {isAdmin && (
                                 <>
-                                    <button onClick={() => setSeccion('pedidos')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({pedidos.length})</button>
-                                    <button onClick={() => setSeccion('historial')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
+                                    <button onClick={() => setSeccion('pedidos')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({pedidos.length})</button>
+                                    <button onClick={() => setSeccion('historial')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
                                 </>
                             )}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-5 py-2 rounded-xl text-[10px] font-black bg-slate-800 border border-slate-700 uppercase">
-                                {isAdmin ? 'Salir' : 'Admin'}
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-6 py-2 rounded-xl text-[10px] font-black bg-slate-800 border border-slate-700 uppercase">
+                                {isAdmin ? 'Cerrar Sesión' : 'Admin'}
                             </button>
                         </div>
                     </header>
 
                     <main className="max-w-7xl mx-auto">
-                        {/* SECCIÓN INVENTARIO */}
                         {seccion === 'stock' && (
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                <div className="col-span-full mb-6 relative">
-                                    <input type="text" placeholder="Buscar..." className="w-full bg-slate-900 p-4 rounded-2xl border border-slate-800 outline-none focus:border-orange-500" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-4 top-4 text-orange-500 font-bold">✕</button>}
+                            <div className="animate-in fade-in duration-500">
+                                {/* BUSCADOR Y AGREGAR */}
+                                <div className="flex gap-4 mb-8">
+                                    <div className="relative flex-1">
+                                        <input type="text" placeholder="Buscar herramienta..." className="w-full bg-slate-900 p-5 rounded-2xl border border-slate-800 focus:border-orange-500 outline-none" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                        {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-5 top-5 text-orange-500">✕</button>}
+                                    </div>
+                                    {isAdmin && (
+                                        <button onClick={() => setForm({ nombre: '', cantidad: '', lugar: '', foto_url: '' })} className="bg-orange-600 px-8 rounded-2xl font-black text-2xl hover:scale-105 transition-all shadow-lg">+</button>
+                                    )}
                                 </div>
-                                {filtrarHerramientas.map(h => (
-                                    <div key={h.id} className={`glass p-4 rounded-[2rem] flex flex-col ${h.cantidad <= 3 ? 'border-red-500/50 border' : ''}`}>
-                                        <img src={h.foto_url} className="h-32 w-full object-contain mb-4" />
-                                        <h3 className="font-bold text-[11px] uppercase truncate">{h.nombre}</h3>
-                                        <p className="text-[14px] font-tech text-orange-500 mb-4">{h.cantidad} UNI</p>
-                                        {!isAdmin && (
-                                            <button onClick={async () => {
-                                                const n = prompt("Tu nombre:"); const t = prompt("Tarea:"); const c = prompt("Cantidad:");
-                                                if(n && t && c) await supabase.from('pedidos').insert([{ herramienta_id: h.id, herramienta_nombre: h.nombre, usuario_nombre: n, tarea: t, cantidad_pedida: parseInt(c), foto_url: h.foto_url }]);
-                                                fetchData();
-                                            }} className="mt-auto bg-orange-600 py-2 rounded-xl text-[9px] font-black uppercase">Solicitar</button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
 
-                        {/* SECCIÓN PEDIDOS */}
-                        {seccion === 'pedidos' && (
-                            <div className="space-y-4">
-                                {pedidos.map(p => (
-                                    <div key={p.id} className="glass p-6 rounded-[2rem] flex items-center gap-6 border-l-4 border-l-blue-500">
-                                        <div className="flex-1">
-                                            <h4 className="text-xl font-black uppercase text-orange-500">{p.herramienta_nombre} x{p.cantidad_pedida}</h4>
-                                            <p className="text-xs font-bold text-slate-400">SOLICITA: {p.usuario_nombre} | TAREA: {p.tarea}</p>
+                                {/* FORMULARIO ADMIN (Solo si hay intención de crear/editar) */}
+                                {isAdmin && (form.nombre !== undefined || form.id) && (
+                                    <div className="glass p-6 rounded-[2rem] mb-10 border border-orange-500/30">
+                                        <h2 className="font-tech text-xs text-orange-500 mb-6 uppercase tracking-widest">{form.id ? 'Editando Material' : 'Nuevo Material'}</h2>
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                            <input type="text" placeholder="Nombre" className="bg-slate-950 p-4 rounded-xl border border-slate-800" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
+                                            <input type="number" placeholder="Stock" className="bg-slate-950 p-4 rounded-xl border border-slate-800" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} />
+                                            <input type="text" placeholder="Lugar" className="bg-slate-950 p-4 rounded-xl border border-slate-800" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                            <input type="file" className="text-[10px] mt-3" onChange={e => setForm({...form, foto: e.target.files[0]})} />
                                         </div>
-                                        <button onClick={() => entregarPedido(p)} className="bg-green-600 px-8 py-4 rounded-2xl font-black text-xs">ENTREGAR</button>
+                                        <div className="mt-6 flex gap-2">
+                                            <button onClick={handleGuardar} disabled={cargando} className="bg-orange-600 px-10 py-3 rounded-xl font-black text-xs uppercase disabled:opacity-50">
+                                                {cargando ? 'Guardando...' : 'Confirmar'}
+                                            </button>
+                                            <button onClick={() => setForm({})} className="bg-slate-800 px-6 py-3 rounded-xl font-black text-xs uppercase">Cancelar</button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* LISTA DE CARDS */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                    {filtrarHerramientas.map(h => (
+                                        <div key={h.id} className={`glass rounded-[2rem] overflow-hidden flex flex-col group transition-all hover:border-orange-500/50 ${h.cantidad <= 3 ? 'border-red-600/50' : ''}`}>
+                                            <div className="h-32 bg-slate-950 p-4">
+                                                <img src={h.foto_url} className="w-full h-full object-contain" loading="lazy" />
+                                            </div>
+                                            <div className="p-4 flex flex-col flex-grow">
+                                                <h3 className="font-bold text-[10px] uppercase truncate mb-1">{h.nombre}</h3>
+                                                <div className="flex justify-between items-end mt-auto">
+                                                    <div>
+                                                        <p className="text-[8px] text-slate-500 font-bold uppercase">Ubicación</p>
+                                                        <p className="text-[10px] font-bold text-slate-300">{h.lugar || 'N/A'}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[14px] font-tech text-orange-500">{h.cantidad}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 flex gap-1">
+                                                    {isAdmin ? (
+                                                        <>
+                                                            <button onClick={() => { setForm(h); window.scrollTo(0,0); }} className="flex-1 bg-slate-800 py-2 rounded-lg text-[8px] font-black uppercase">Editar</button>
+                                                            <button onClick={async () => { if(confirm("¿Eliminar?")) { await supabase.from('herramientas').delete().eq('id', h.id); fetchData(); } }} className="bg-slate-800 px-3 rounded-lg text-red-500">✕</button>
+                                                        </>
+                                                    ) : (
+                                                        <button onClick={() => setModalPedido(h)} disabled={h.cantidad <= 0} className="w-full bg-orange-600 py-2 rounded-lg text-[9px] font-black uppercase disabled:bg-slate-800">Solicitar</button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {seccion === 'pedidos' && isAdmin && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {pedidos.map(p => (
+                                    <div key={p.id} className="glass p-6 rounded-[2rem] flex items-center gap-6 border-l-4 border-l-blue-600">
+                                        <div className="w-16 h-16 bg-slate-950 rounded-xl p-2">
+                                            <img src={p.foto_url} className="w-full h-full object-contain" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="font-tech text-sm text-orange-500">{p.herramienta_nombre} x{p.cantidad_pedida}</h4>
+                                            <p className="text-[10px] font-bold uppercase text-slate-400">{p.usuario_nombre} | {p.tarea}</p>
+                                        </div>
+                                        <button onClick={() => entregar(p)} className="bg-green-600 px-6 py-3 rounded-xl font-black text-[10px]">ENTREGAR</button>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {/* SECCIÓN HISTORIAL (LA MEJORA QUE FALTABA) */}
-                        {seccion === 'historial' && (
+                        {seccion === 'historial' && isAdmin && (
                             <div className="glass rounded-[2rem] overflow-hidden">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-900 text-slate-400 font-tech">
+                                <table className="w-full text-left text-[10px]">
+                                    <thead className="bg-slate-900 text-slate-500 font-tech">
                                         <tr>
                                             <th className="p-4">FECHA</th>
                                             <th className="p-4">MATERIAL</th>
                                             <th className="p-4">USUARIO</th>
                                             <th className="p-4">CANT.</th>
-                                            <th className="p-4">MOTIVO</th>
+                                            <th className="p-4">TAREA</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800">
                                         {historial.map(hi => (
-                                            <tr key={hi.id} className="hover:bg-slate-800/30 transition-colors">
-                                                <td className="p-4 text-slate-500">{new Date(hi.fecha).toLocaleString()}</td>
-                                                <td className="p-4 font-bold text-orange-500 uppercase">{hi.herramienta_nombre}</td>
+                                            <tr key={hi.id}>
+                                                <td className="p-4 text-slate-500 font-tech">{new Date(hi.fecha).toLocaleDateString()}</td>
+                                                <td className="p-4 font-black uppercase text-orange-500">{hi.herramienta_nombre}</td>
                                                 <td className="p-4 font-bold uppercase">{hi.usuario}</td>
-                                                <td className="p-4 font-tech">{hi.cantidad}</td>
-                                                <td className="p-4 italic text-slate-400">{hi.tarea}</td>
+                                                <td className="p-4">{hi.cantidad}</td>
+                                                <td className="p-4 text-slate-400 italic">{hi.tarea}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -169,14 +255,46 @@
                         )}
                     </main>
 
-                    {/* LOGIN MODAL */}
+                    {/* VENTANA MODAL DE SOLICITUD (PARA TRABAJADORES) */}
+                    {modalPedido && (
+                        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 z-50">
+                            <div className="glass p-8 rounded-[3rem] border border-orange-500/40 w-full max-w-sm text-center">
+                                <h3 className="font-tech text-xs text-orange-500 mb-2 uppercase">Solicitar Material</h3>
+                                <p className="text-xl font-black mb-6 uppercase">{modalPedido.nombre}</p>
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="Tu Nombre" className="w-full bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none" value={pedidoForm.usuario} onChange={e => setPedidoForm({...pedidoForm, usuario: e.target.value})} />
+                                    <input type="text" placeholder="¿En qué tarea se usará?" className="w-full bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none" value={pedidoForm.tarea} onChange={e => setPedidoForm({...pedidoForm, tarea: e.target.value})} />
+                                    <div className="flex items-center justify-center gap-4 bg-slate-900 p-2 rounded-xl">
+                                        <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.max(1, pedidoForm.cantidad - 1)})} className="text-2xl font-black px-4">-</button>
+                                        <span className="font-tech text-xl">{pedidoForm.cantidad}</span>
+                                        <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.min(modalPedido.cantidad, pedidoForm.cantidad + 1)})} className="text-2xl font-black px-4">+</button>
+                                    </div>
+                                </div>
+                                <div className="mt-8 flex gap-2">
+                                    <button onClick={enviarPedido} className="flex-1 bg-orange-600 py-4 rounded-2xl font-black uppercase text-[10px]">Enviar Solicitud</button>
+                                    <button onClick={() => setModalPedido(null)} className="px-6 bg-slate-800 rounded-2xl font-black">✕</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODAL LOGIN */}
                     {mostrarLogin && (
-                        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-6 z-50">
-                            <div className="glass p-10 rounded-[3rem] border border-orange-500 w-full max-w-sm text-center">
-                                <h2 className="font-tech text-xs mb-8 tracking-widest">PASSWORD ADMIN</h2>
-                                <input type="password" placeholder="••••" className="w-full bg-slate-900 p-4 rounded-2xl text-center text-2xl outline-none border border-slate-700" 
-                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), setSeccion('stock'))} />
-                                <button onClick={() => setMostrarLogin(false)} className="mt-6 text-[10px] text-slate-500 uppercase">Cerrar</button>
+                        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 z-50">
+                            <div className="glass p-10 rounded-[3rem] border border-orange-500 w-full max-w-xs text-center">
+                                <div className="w-16 h-16 bg-orange-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg">
+                                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                </div>
+                                <h2 className="font-tech text-[10px] tracking-widest mb-6 uppercase">Acceso Restringido</h2>
+                                <input type="password" placeholder="••••" className="w-full bg-slate-900 p-4 rounded-2xl text-center text-2xl border border-slate-700 outline-none focus:border-orange-500" autoFocus 
+                                    onChange={e => {
+                                        if(e.target.value === ADMIN_PASSWORD) {
+                                            setIsAdmin(true); 
+                                            setMostrarLogin(false);
+                                            setSeccion('stock');
+                                        }
+                                    }} />
+                                <button onClick={() => setMostrarLogin(false)} className="mt-6 text-[10px] text-slate-500 uppercase font-black">Cancelar</button>
                             </div>
                         </div>
                     )}
