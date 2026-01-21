@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Pro v12 - Full Unidades</title>
+    <title>StockMaster Pro v13 - Ultra Fast</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -18,13 +18,15 @@
         .tab-active { background: #f97316 !important; color: white !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.4); }
         input, select { outline: none; transition: all 0.2s; }
         input:focus, select:focus { border-color: #f97316 !important; }
+        .fade-in-fast { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useCallback } = React;
 
         const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
@@ -44,20 +46,22 @@
             const [modalPedido, setModalPedido] = useState(null);
             const [cargando, setCargando] = useState(false);
 
-            // Formulario con la nueva UNIDAD
             const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ', foto_url: '', foto: null });
             const [pedidoForm, setPedidoForm] = useState({ usuario: '', tarea: '', cantidad: 1 });
 
-            useEffect(() => { fetchData(); }, []);
+            // CARGA ULTRA RÁPIDA (Paralela)
+            const fetchData = useCallback(async () => {
+                const [hRes, pRes, hiRes] = await Promise.all([
+                    supabase.from('herramientas').select('*').order('nombre'),
+                    supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
+                    supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(40)
+                ]);
+                if (hRes.data) setHerramientas(hRes.data);
+                if (pRes.data) setPedidos(pRes.data);
+                if (hiRes.data) setHistorial(hiRes.data);
+            }, []);
 
-            const fetchData = async () => {
-                const { data: h } = await supabase.from('herramientas').select('*').order('nombre');
-                const { data: p } = await supabase.from('pedidos').select('*').order('created_at', { ascending: false });
-                const { data: hi } = await supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(50);
-                if (h) setHerramientas(h);
-                if (p) setPedidos(p);
-                if (hi) setHistorial(hi);
-            };
+            useEffect(() => { fetchData(); }, [fetchData]);
 
             const filtrarHerramientas = useMemo(() => {
                 const b = normalizar(busqueda);
@@ -81,7 +85,7 @@
                         nombre: form.nombre, 
                         cantidad: parseFloat(form.cantidad), 
                         lugar: form.lugar, 
-                        unidad: form.unidad, // Guardar unidad
+                        unidad: form.unidad,
                         foto_url: urlFinal 
                     };
                     
@@ -107,7 +111,8 @@
                     herramienta_nombre: p.herramienta_nombre,
                     usuario: p.usuario_nombre,
                     cantidad: p.cantidad_pedida,
-                    tarea: p.tarea
+                    tarea: p.tarea,
+                    foto_url: p.foto_url // Ahora guardamos la foto en el historial
                 }]);
                 await supabase.from('pedidos').delete().eq('id', p.id);
                 fetchData();
@@ -133,23 +138,20 @@
                         </div>
                     </header>
 
-                    <main className="max-w-7xl mx-auto">
+                    <main className="max-w-7xl mx-auto fade-in-fast">
                         {seccion === 'stock' && (
                             <div>
                                 <div className="flex gap-4 mb-8">
-                                    <input type="text" placeholder="Buscar..." className="flex-1 bg-slate-900 p-4 rounded-2xl border border-slate-800 outline-none" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    <input type="text" placeholder="Buscar material..." className="flex-1 bg-slate-900 p-4 rounded-2xl border border-slate-800 outline-none focus:border-orange-500" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
                                     {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ' })} className="bg-orange-600 px-8 rounded-2xl font-black text-2xl shadow-lg">+</button>}
                                 </div>
 
-                                {/* FORMULARIO ADMIN ACTUALIZADO CON UNIDAD */}
                                 {isAdmin && (form.nombre !== undefined || form.id) && (
                                     <div className="glass p-6 rounded-[2rem] mb-10 border border-orange-500/30 animate-in fade-in zoom-in duration-300">
                                         <h2 className="font-tech text-[10px] text-orange-500 mb-6 uppercase tracking-widest">{form.id ? 'Editando Material' : 'Nuevo Registro'}</h2>
                                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                                            <input type="text" placeholder="Nombre Material" className="bg-slate-950 p-4 rounded-xl border border-slate-800" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
+                                            <input type="text" placeholder="Nombre" className="bg-slate-950 p-4 rounded-xl border border-slate-800" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
                                             <input type="number" placeholder="Stock" className="bg-slate-950 p-4 rounded-xl border border-slate-800" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} />
-                                            
-                                            {/* SELECT DE UNIDAD */}
                                             <select className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-slate-400" value={form.unidad} onChange={e => setForm({...form, unidad: e.target.value})}>
                                                 <option value="PZ">PIEZAS (PZ)</option>
                                                 <option value="KG">KILOS (KG)</option>
@@ -158,8 +160,7 @@
                                                 <option value="LTS">LITROS (LTS)</option>
                                                 <option value="MTS">METROS (MTS)</option>
                                             </select>
-
-                                            <input type="text" placeholder="Lugar/Estante" className="bg-slate-950 p-4 rounded-xl border border-slate-800" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                            <input type="text" placeholder="Ubicación" className="bg-slate-950 p-4 rounded-xl border border-slate-800" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
                                             <input type="file" className="text-[10px] pt-4" onChange={e => setForm({...form, foto: e.target.files[0]})} />
                                         </div>
                                         <div className="mt-6 flex gap-2">
@@ -172,16 +173,16 @@
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                                     {filtrarHerramientas.map(h => (
                                         <div key={h.id} className="glass rounded-[2rem] overflow-hidden flex flex-col hover:border-orange-500/50 transition-all shadow-xl">
-                                            <div className="h-32 bg-slate-950 p-4"><img src={h.foto_url} className="w-full h-full object-contain" /></div>
+                                            <div className="h-32 bg-slate-950 p-4"><img src={h.foto_url} className="w-full h-full object-contain" loading="lazy" /></div>
                                             <div className="p-4 flex flex-col flex-grow">
                                                 <h3 className="font-bold text-[10px] uppercase truncate mb-1">{h.nombre}</h3>
                                                 <div className="flex justify-between items-end mt-auto">
                                                     <div>
-                                                        <p className="text-[8px] text-slate-500 font-bold uppercase">Ubicación</p>
+                                                        <p className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">Ubicación</p>
                                                         <p className="text-[10px] font-bold text-slate-300 italic">{h.lugar || 'BODEGA'}</p>
                                                     </div>
                                                     <div className="text-right">
-                                                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">Disponible</p>
+                                                        <p className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">Stock</p>
                                                         <div className="flex items-center justify-end gap-1">
                                                             <span className={`text-lg font-tech ${h.cantidad <= 3 ? 'text-red-500' : 'text-orange-500'}`}>{h.cantidad}</span>
                                                             <span className="text-[8px] font-bold text-slate-400">{h.unidad || 'PZ'}</span>
@@ -202,15 +203,15 @@
                             </div>
                         )}
 
-                        {/* SECCIONES PEDIDOS E HISTORIAL SE MANTIENEN IGUAL (ADMIN) */}
                         {seccion === 'pedidos' && isAdmin && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {pedidos.map(p => (
-                                    <div key={p.id} className="glass p-6 rounded-[2rem] flex items-center gap-6 border-l-4 border-l-blue-600">
+                                    <div key={p.id} className="glass p-4 rounded-[2rem] flex items-center gap-4 border-l-4 border-l-blue-600">
+                                        <img src={p.foto_url} className="w-16 h-16 rounded-xl object-contain bg-black/40" />
                                         <div className="flex-1">
-                                            <h4 className="font-tech text-sm text-orange-500 uppercase">{p.herramienta_nombre}</h4>
-                                            <p className="text-2xl font-black mb-1">{p.cantidad_pedida} <span className="text-xs text-slate-500">{herramientas.find(h=>h.id===p.herramienta_id)?.unidad || 'PZ'}</span></p>
-                                            <p className="text-[10px] font-bold uppercase text-slate-400">{p.usuario_nombre} | TAREA: {p.tarea}</p>
+                                            <h4 className="font-tech text-xs text-orange-500 uppercase">{p.herramienta_nombre}</h4>
+                                            <p className="text-xl font-black">{p.cantidad_pedida} <span className="text-[10px] text-slate-500">{herramientas.find(h=>h.id===p.herramienta_id)?.unidad || 'PZ'}</span></p>
+                                            <p className="text-[9px] font-bold uppercase text-slate-400">{p.usuario_nombre} | {p.tarea}</p>
                                         </div>
                                         <button onClick={() => entregar(p)} className="bg-green-600 px-6 py-4 rounded-xl font-black text-[10px]">ENTREGAR</button>
                                     </div>
@@ -219,16 +220,26 @@
                         )}
 
                         {seccion === 'historial' && isAdmin && (
-                            <div className="glass rounded-[2rem] overflow-hidden">
+                            <div className="glass rounded-[2rem] overflow-hidden overflow-x-auto">
                                 <table className="w-full text-left text-[10px]">
-                                    <thead className="bg-slate-900 text-slate-500 font-tech"><tr><th className="p-4">FECHA</th><th className="p-4">MATERIAL</th><th className="p-4">USUARIO</th><th className="p-4">CANT.</th><th className="p-4">TAREA</th></tr></thead>
+                                    <thead className="bg-slate-900 text-slate-500 font-tech">
+                                        <tr>
+                                            <th className="p-4">FOTO</th>
+                                            <th className="p-4">FECHA</th>
+                                            <th className="p-4">MATERIAL</th>
+                                            <th className="p-4">USUARIO</th>
+                                            <th className="p-4">CANT.</th>
+                                            <th className="p-4">TAREA</th>
+                                        </tr>
+                                    </thead>
                                     <tbody className="divide-y divide-slate-800">
                                         {historial.map(hi => (
-                                            <tr key={hi.id}>
+                                            <tr key={hi.id} className="hover:bg-white/5 transition-colors">
+                                                <td className="p-2"><img src={hi.foto_url} className="w-10 h-10 object-contain bg-black/20 rounded-lg" /></td>
                                                 <td className="p-4 text-slate-500 font-tech">{new Date(hi.fecha).toLocaleDateString()}</td>
                                                 <td className="p-4 font-black uppercase text-orange-500">{hi.herramienta_nombre}</td>
                                                 <td className="p-4 font-bold uppercase">{hi.usuario}</td>
-                                                <td className="p-4">{hi.cantidad}</td>
+                                                <td className="p-4 font-tech">{hi.cantidad}</td>
                                                 <td className="p-4 text-slate-400 italic">{hi.tarea}</td>
                                             </tr>
                                         ))}
@@ -242,11 +253,12 @@
                     {modalPedido && (
                         <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center p-6 z-50">
                             <div className="glass p-8 rounded-[3rem] border border-orange-500/40 w-full max-w-sm text-center">
-                                <h3 className="font-tech text-xs text-orange-500 mb-2">SOLICITAR</h3>
+                                <img src={modalPedido.foto_url} className="w-24 h-24 mx-auto mb-4 object-contain" />
+                                <h3 className="font-tech text-xs text-orange-500 mb-2 tracking-widest uppercase">Solicitar Material</h3>
                                 <p className="text-xl font-black mb-6 uppercase">{modalPedido.nombre}</p>
                                 <div className="space-y-4">
                                     <input type="text" placeholder="Tu Nombre" className="w-full bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none" value={pedidoForm.usuario} onChange={e => setPedidoForm({...pedidoForm, usuario: e.target.value})} />
-                                    <input type="text" placeholder="¿Tarea?" className="w-full bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none" value={pedidoForm.tarea} onChange={e => setPedidoForm({...pedidoForm, tarea: e.target.value})} />
+                                    <input type="text" placeholder="¿En qué tarea se usará?" className="w-full bg-slate-900 p-4 rounded-xl border border-slate-700 outline-none" value={pedidoForm.tarea} onChange={e => setPedidoForm({...pedidoForm, tarea: e.target.value})} />
                                     <div className="flex items-center justify-center gap-4 bg-slate-900 p-2 rounded-xl">
                                         <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.max(1, pedidoForm.cantidad - 1)})} className="px-4 text-2xl">-</button>
                                         <span className="font-tech text-xl">{pedidoForm.cantidad} {modalPedido.unidad}</span>
@@ -254,7 +266,7 @@
                                     </div>
                                 </div>
                                 <button onClick={async () => {
-                                    if(!pedidoForm.usuario) return alert("Pon tu nombre");
+                                    if(!pedidoForm.usuario) return alert("Por favor ingresa tu nombre");
                                     await supabase.from('pedidos').insert([{
                                         herramienta_id: modalPedido.id,
                                         herramienta_nombre: modalPedido.nombre,
@@ -265,9 +277,9 @@
                                     }]);
                                     setModalPedido(null);
                                     fetchData();
-                                    alert("Enviado");
-                                }} className="w-full bg-orange-600 mt-6 py-4 rounded-2xl font-black uppercase text-[10px]">Confirmar Pedido</button>
-                                <button onClick={() => setModalPedido(null)} className="mt-4 text-[10px] text-slate-500 font-bold uppercase">Cerrar</button>
+                                    alert("¡Pedido enviado correctamente!");
+                                }} className="w-full bg-orange-600 mt-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-orange-600/20">Confirmar Pedido</button>
+                                <button onClick={() => setModalPedido(null)} className="mt-4 text-[10px] text-slate-500 font-bold uppercase hover:text-white transition-colors">Cancelar</button>
                             </div>
                         </div>
                     )}
@@ -276,9 +288,9 @@
                     {mostrarLogin && (
                         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-6 z-50">
                             <div className="glass p-10 rounded-[3rem] border border-orange-500 w-full max-w-xs text-center">
-                                <h2 className="font-tech text-[10px] tracking-widest mb-6 uppercase">Admin Access</h2>
-                                <input type="password" placeholder="••••" className="w-full bg-slate-900 p-4 rounded-2xl text-center text-2xl outline-none" autoFocus 
-                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false))} />
+                                <h2 className="font-tech text-[10px] tracking-widest mb-6 uppercase">Acceso Administrador</h2>
+                                <input type="password" placeholder="••••" className="w-full bg-slate-900 p-4 rounded-2xl text-center text-2xl outline-none border border-slate-800 focus:border-orange-500" autoFocus 
+                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), setSeccion('stock'))} />
                             </div>
                         </div>
                     )}
