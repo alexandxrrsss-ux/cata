@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Elite v28.4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StockMaster Elite v28.5</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -12,17 +12,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { --orange: #f97316; --dark: #020617; }
-        body { background: var(--dark); color: #f8fafc; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+        body { background: var(--dark); color: #f8fafc; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; font-size: 14px; }
         .font-tech { font-family: 'Orbitron', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.08); }
+        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.08); }
         .glass-card { background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(255,255,255,0.05); }
-        .tab-active { background: var(--orange) !important; color: white !important; box-shadow: 0 0 20px rgba(249, 115, 22, 0.4); }
-        .loader-spin { border: 3px solid rgba(249, 115, 22, 0.1); border-top: 3px solid var(--orange); border-radius: 50%; width: 30px; height: 30px; animation: spin 0.8s linear infinite; }
+        .tab-active { background: var(--orange) !important; color: white !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.3); }
+        .loader-spin { border: 2px solid rgba(249, 115, 22, 0.1); border-top: 2px solid var(--orange); border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .btn-x { position: absolute; top: -12px; right: -12px; width: 32px; height: 32px; background: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); z-index: 50; cursor: pointer; }
-        .img-pro-box { position: relative; width: 100%; height: 140px; background: #000; border-radius: 1.2rem; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-        input { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; transition: all 0.3s; color: white; }
-        .notif { position: fixed; top: 20px; right: 20px; padding: 15px 30px; border-radius: 15px; background: #10b981; color: white; font-weight: 900; font-size: 12px; z-index: 100; animation: slideIn 0.3s ease-out; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3); }
+        .btn-x { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px; background: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; z-index: 50; cursor: pointer; font-size: 12px; }
+        .img-pro-box { position: relative; width: 100%; height: 110px; background: #000; border-radius: 0.8rem; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        input { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; color: white; outline: none; }
+        .notif { position: fixed; top: 10px; right: 10px; padding: 10px 20px; border-radius: 10px; background: #10b981; color: white; font-weight: 800; font-size: 10px; z-index: 100; animation: slideIn 0.3s ease-out; }
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
     </style>
 </head>
@@ -47,13 +47,13 @@
             const [isUploading, setIsUploading] = useState(false);
             const [notif, setNotif] = useState("");
 
-            const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 3000); };
+            const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 2500); };
 
             const fetchData = useCallback(async () => {
                 const [h, p, hi] = await Promise.all([
                     supabase.from('herramientas').select('*').order('nombre'),
                     supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
-                    supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(60)
+                    supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(40)
                 ]);
                 setData({ herramientas: h.data || [], pedidos: p.data || [], historial: hi.data || [] });
             }, []);
@@ -73,7 +73,7 @@
                 if (!error) {
                     const { data: { publicUrl } } = supabase.storage.from('fotos').getPublicUrl(name);
                     setForm({ ...form, foto_url: publicUrl });
-                    showMsg("IMAGEN CARGADA");
+                    showMsg("IMAGEN LISTA");
                 }
                 setIsUploading(false);
             };
@@ -82,44 +82,44 @@
             const filtrarStock = data.herramientas.filter(h => normalizar(h.nombre).includes(normalizar(busqueda)));
 
             return (
-                <div className="min-h-screen pb-24">
-                    {notif && <div className="notif uppercase tracking-widest font-tech">✓ {notif}</div>}
+                <div className="min-h-screen pb-16">
+                    {notif && <div className="notif uppercase font-tech">✓ {notif}</div>}
                     
-                    <header className="py-8 sticky top-0 z-40 glass px-6 flex flex-col items-center">
-                        <div className="font-tech font-black text-2xl tracking-[0.2em] mb-6 uppercase italic">STOCK<span className="text-orange-500">PRO</span></div>
-                        <div className="flex gap-2 p-1.5 glass rounded-2xl border border-white/5">
-                            <button onClick={() => setSeccion('stock')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
+                    <header className="py-4 sticky top-0 z-40 glass px-4 flex flex-col items-center">
+                        <div className="font-tech font-black text-lg tracking-widest mb-3 uppercase italic">STOCK<span className="text-orange-500">PRO</span></div>
+                        <div className="flex gap-1.5 p-1 glass rounded-xl border border-white/5">
+                            <button onClick={() => setSeccion('stock')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
                             {isAdmin && (
                                 <>
-                                    <button onClick={() => setSeccion('pedidos')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({data.pedidos.length})</button>
-                                    <button onClick={() => setSeccion('historial')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
+                                    <button onClick={() => setSeccion('pedidos')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos</button>
+                                    <button onClick={() => setSeccion('historial')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
                                 </>
                             )}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase bg-white/5 border border-white/10">{isAdmin ? 'Salir' : 'Admin'}</button>
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white/5 border border-white/10">{isAdmin ? 'Salir' : 'Admin'}</button>
                         </div>
                     </header>
 
-                    <main className="max-w-[1400px] mx-auto p-6">
+                    <main className="max-w-[1200px] mx-auto p-4">
                         {seccion === 'stock' && (
                             <>
-                                <div className="flex gap-3 mb-10">
-                                    <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 p-5 rounded-2xl font-bold uppercase text-[11px] tracking-widest outline-none shadow-inner" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, unidad: 'PZ', lugar: '', foto_url: '' })} className="bg-orange-600 px-8 rounded-2xl font-black text-2xl shadow-lg active:scale-90 transition-transform">+</button>}
+                                <div className="flex gap-2 mb-6">
+                                    <input type="text" placeholder="BUSCAR..." className="flex-1 p-3 rounded-xl font-bold uppercase text-[10px] tracking-widest" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, unidad: 'PZ', lugar: '', foto_url: '' })} className="bg-orange-600 px-5 rounded-xl font-black text-xl shadow-lg">+</button>}
                                 </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                                     {filtrarStock.map(h => (
-                                        <div key={h.id} className="glass-card rounded-[2.5rem] p-4 flex flex-col group transition-all hover:border-orange-500/30">
+                                        <div key={h.id} className="glass-card rounded-[1.5rem] p-3 flex flex-col group transition-all">
                                             <div className="img-pro-box">
-                                                <img src={h.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
+                                                <img src={h.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-1" />
                                             </div>
-                                            <h3 className="text-[11px] font-black uppercase text-center mt-4 mb-2 h-10 flex items-center justify-center leading-tight px-2">{h.nombre}</h3>
-                                            <div className="flex justify-between items-center px-2 mb-5">
-                                                <span className="text-[9px] font-bold text-slate-500 tracking-tighter uppercase">{h.lugar || 'BODEGA'}</span>
-                                                <span className="text-orange-500 font-tech text-xs font-bold">{h.cantidad} PZ</span>
+                                            <h3 className="text-[9px] font-black uppercase text-center mt-2 mb-1 h-8 flex items-center justify-center leading-tight">{h.nombre}</h3>
+                                            <div className="flex justify-between items-center px-1 mb-3">
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase">{h.lugar || 'BOD'}</span>
+                                                <span className="text-orange-500 font-tech text-[10px] font-bold">{h.cantidad} PZ</span>
                                             </div>
                                             <button onClick={() => isAdmin ? setForm(h) : setModalPedido({...h, pedido_cant: 1, user_name: '', job: ''})} 
-                                                className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 ${isAdmin ? 'bg-slate-700 text-white' : 'bg-orange-600 text-white'}`}>
-                                                {isAdmin ? '🔧 Gestionar' : '🛒 Solicitar'}
+                                                className={`w-full py-2.5 rounded-xl font-black text-[9px] uppercase tracking-wider ${isAdmin ? 'bg-slate-700' : 'bg-orange-600'}`}>
+                                                {isAdmin ? '🔧 Editar' : '🛒 Pedir'}
                                             </button>
                                         </div>
                                     ))}
@@ -128,23 +128,19 @@
                         )}
 
                         {seccion === 'historial' && (
-                            <div className="glass rounded-[2.5rem] overflow-hidden border border-white/5">
+                            <div className="glass rounded-2xl overflow-hidden">
                                 {data.historial.map(hi => (
-                                    <div key={hi.id} className="flex items-center gap-6 p-5 border-b border-white/5 hover:bg-white/5 transition-colors">
-                                        <div className="w-16 h-16 shrink-0 bg-black rounded-2xl border border-white/10 overflow-hidden shadow-lg">
-                                            <img src={hi.foto_url} className="w-full h-full object-contain p-1" />
-                                        </div>
+                                    <div key={hi.id} className="flex items-center gap-3 p-3 border-b border-white/5">
+                                        <img src={hi.foto_url} className="w-10 h-10 object-contain bg-black rounded-lg" />
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                                                <span className="bg-orange-500 text-black text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">ACT: {hi.tarea || 'GENERAL'}</span>
-                                                <p className="text-white font-black text-xs uppercase truncate">{hi.herramienta_nombre}</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-orange-500 text-black text-[7px] font-black px-1 rounded">ACT: {hi.tarea}</span>
+                                                <p className="text-white font-black text-[10px] uppercase truncate">{hi.herramienta_nombre}</p>
                                             </div>
-                                            <p className="text-slate-300 text-[10px] font-semibold uppercase">{hi.usuario}</p>
-                                            <p className="text-slate-600 text-[8px] font-bold mt-1 uppercase tracking-tighter">{new Date(hi.fecha).toLocaleString()}</p>
+                                            <p className="text-slate-400 text-[9px] uppercase">{hi.usuario}</p>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="font-tech text-white text-lg font-black">-{hi.cantidad}</div>
-                                            <div className="text-[8px] text-slate-500 font-black tracking-widest uppercase">Pzs</div>
+                                        <div className="text-right shrink-0">
+                                            <div className="font-tech text-white text-sm">-{hi.cantidad}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -152,110 +148,95 @@
                         )}
 
                         {seccion === 'pedidos' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {data.pedidos.map(p => (
-                                    <div key={p.id} className="glass p-5 rounded-[2rem] flex items-center gap-6 border-l-[6px] border-orange-600 shadow-2xl relative">
-                                        <button onClick={async () => { await supabase.from('pedidos').delete().eq('id', p.id); showMsg("ELIMINADO"); }} className="absolute top-4 right-4 text-slate-600 hover:text-red-500 font-black">✕</button>
-                                        <div className="w-20 h-20 bg-black/40 border border-white/5 rounded-2xl flex-shrink-0">
-                                            <img src={p.foto_url} className="w-full h-full object-contain p-2" />
-                                        </div>
+                                    <div key={p.id} className="glass p-3 rounded-2xl flex items-center gap-4 border-l-4 border-orange-600 relative">
+                                        <button onClick={async () => { await supabase.from('pedidos').delete().eq('id', p.id); showMsg("BORRADO"); }} className="absolute top-2 right-2 text-slate-600 text-xs">✕</button>
+                                        <img src={p.foto_url} className="w-14 h-14 object-contain bg-black/40 rounded-xl" />
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-black text-orange-500 text-xs uppercase truncate mb-1">{p.herramienta_nombre}</p>
-                                            <p className="text-white text-[10px] font-bold uppercase mb-1">{p.usuario_nombre}</p>
-                                            <p className="text-slate-500 text-[8px] font-black uppercase bg-white/5 inline-block px-2 py-0.5 rounded">Trabajo: {p.tarea}</p>
-                                            <div className="font-tech text-white font-black text-lg mt-2">{p.cantidad_pedida} PZ</div>
+                                            <p className="font-black text-orange-500 text-[10px] uppercase truncate">{p.herramienta_nombre}</p>
+                                            <p className="text-white text-[9px] font-bold uppercase">{p.usuario_nombre}</p>
+                                            <p className="text-slate-500 text-[7px] uppercase italic">{p.tarea}</p>
+                                            <div className="font-tech text-white text-sm mt-1">{p.cantidad_pedida} PZ</div>
                                         </div>
                                         <button onClick={async () => {
                                             const h = data.herramientas.find(i => i.id === p.herramienta_id);
-                                            if(!h || h.cantidad < p.cantidad_pedida) return alert("STOCK INSUFICIENTE");
+                                            if(!h || h.cantidad < p.cantidad_pedida) return alert("SIN STOCK");
                                             await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
                                             await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
                                             await supabase.from('pedidos').delete().eq('id', p.id);
-                                            showMsg("DESPACHADO CON ÉXITO");
-                                        }} className="bg-green-600 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95">Despachar</button>
+                                            showMsg("DESPACHADO");
+                                        }} className="bg-green-600 px-4 py-2 rounded-xl font-black text-[8px] uppercase">LISTO</button>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </main>
 
-                    {/* MODAL ADMIN - GESTIÓN */}
+                    {/* MODAL GESTIÓN REDUCIDO */}
                     {form && (
-                        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
-                            <div className="glass p-10 rounded-[3.5rem] w-full max-w-sm relative border-white/10">
+                        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="glass p-6 rounded-[2rem] w-full max-w-xs relative border-white/10">
                                 <div className="btn-x" onClick={() => setForm(null)}>✕</div>
-                                <h2 className="text-center font-black text-orange-500 uppercase tracking-[0.3em] text-sm mb-10 italic">Gestionar</h2>
-                                <div className="flex flex-col items-center gap-6 mb-8">
-                                    <div className="w-40 h-40 bg-black rounded-[2rem] border border-white/10 overflow-hidden relative shadow-2xl group">
-                                        {isUploading && <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20"><div className="loader-spin"></div></div>}
+                                <div className="flex flex-col items-center gap-4 mb-4">
+                                    <div className="w-28 h-28 bg-black rounded-2xl overflow-hidden relative border border-white/10 group">
                                         <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
-                                        <label className="absolute inset-0 bg-orange-600/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer font-black text-[10px] uppercase text-center px-4">
+                                        <label className="absolute inset-0 bg-orange-600/60 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[8px] font-black uppercase text-center p-2">
                                             {form.id ? "Cambiar Imagen" : "Agregar Imagen"}
                                             <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
                                         </label>
                                     </div>
                                 </div>
-                                <div className="space-y-4">
-                                    <input type="text" placeholder="NOMBRE MATERIAL" className="w-full p-5 rounded-2xl font-bold uppercase text-[10px] tracking-widest" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input type="number" placeholder="STOCK" className="w-full p-5 rounded-2xl font-bold text-[10px]" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
-                                        <input type="text" placeholder="BODEGA/LUGAR" className="w-full p-5 rounded-2xl font-bold uppercase text-[10px]" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value.toUpperCase()})} />
+                                <div className="space-y-3">
+                                    <input type="text" placeholder="NOMBRE" className="w-full p-3 rounded-xl font-bold uppercase text-[9px]" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input type="number" placeholder="STOCK" className="w-full p-3 rounded-xl font-bold text-[9px]" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
+                                        <input type="text" placeholder="LUGAR" className="w-full p-3 rounded-xl font-bold uppercase text-[9px]" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value.toUpperCase()})} />
                                     </div>
                                 </div>
-                                <div className="mt-10 flex gap-3">
-                                    {form.id && <button onClick={async () => { if(confirm("¿Eliminar?")) { await supabase.from('herramientas').delete().eq('id', form.id); setForm(null); showMsg("ELIMINADO"); } }} className="bg-red-500/10 text-red-500 px-6 rounded-2xl">🗑</button>}
-                                    <button onClick={async () => {
-                                        if(!form.nombre) return alert("EL NOMBRE ES OBLIGATORIO");
-                                        const finalData = { ...form, unidad: 'PZ', foto_url: form.foto_url || 'https://via.placeholder.com/150' };
-                                        if(form.id) await supabase.from('herramientas').update(finalData).eq('id', form.id);
-                                        else await supabase.from('herramientas').insert([finalData]);
-                                        setForm(null);
-                                        showMsg("GUARDADO EXITOSO");
-                                    }} className="flex-1 bg-orange-600 py-5 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-lg shadow-orange-600/30">Confirmar Guardado</button>
-                                </div>
+                                <button onClick={async () => {
+                                    if(!form.nombre) return;
+                                    const finalData = { ...form, unidad: 'PZ', foto_url: form.foto_url || 'https://via.placeholder.com/150' };
+                                    if(form.id) await supabase.from('herramientas').update(finalData).eq('id', form.id);
+                                    else await supabase.from('herramientas').insert([finalData]);
+                                    setForm(null); showMsg("GUARDADO");
+                                }} className="w-full mt-6 bg-orange-600 py-3 rounded-xl font-black uppercase text-[10px]">Guardar</button>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL PEDIDO - USUARIOS */}
+                    {/* MODAL PEDIDO REDUCIDO */}
                     {modalPedido && (
-                        <div className="fixed inset-0 z-[60] bg-black/98 flex items-center justify-center p-6">
-                            <div className="glass p-10 rounded-[3.5rem] w-full max-w-sm relative text-center border-orange-500/20 shadow-2xl">
+                        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
+                            <div className="glass p-6 rounded-[2rem] w-full max-w-xs relative text-center border-orange-500/20">
                                 <div className="btn-x" onClick={() => setModalPedido(null)}>✕</div>
-                                <div className="h-40 mb-8 border border-white/5 rounded-3xl overflow-hidden bg-black/40">
-                                    <img src={modalPedido.foto_url} className="w-full h-full object-contain p-2" />
+                                <img src={modalPedido.foto_url} className="h-28 mx-auto mb-4 object-contain" />
+                                <h2 className="font-black text-orange-500 uppercase text-[10px] mb-4">{modalPedido.nombre}</h2>
+                                <div className="space-y-2 mb-4">
+                                    <input type="text" placeholder="TU NOMBRE" className="w-full p-3 rounded-xl text-center font-bold uppercase text-[9px]" onChange={e => setModalPedido({...modalPedido, user_name: e.target.value})} />
+                                    <input type="text" placeholder="ACTIVIDAD" className="w-full p-3 rounded-xl text-center font-bold uppercase text-[9px]" onChange={e => setModalPedido({...modalPedido, job: e.target.value})} />
                                 </div>
-                                <h2 className="font-black text-orange-500 uppercase text-xs mb-8 tracking-widest">{modalPedido.nombre}</h2>
-                                <div className="space-y-3 mb-8">
-                                    <input type="text" placeholder="NOMBRE DE QUIÉN RECIBE" className="w-full p-5 rounded-2xl text-center font-bold uppercase text-[10px] tracking-widest" onChange={e => setModalPedido({...modalPedido, user_name: e.target.value})} />
-                                    <input type="text" placeholder="TRABAJO O ACTIVIDAD" className="w-full p-5 rounded-2xl text-center font-bold uppercase text-[10px] tracking-widest" onChange={e => setModalPedido({...modalPedido, job: e.target.value})} />
+                                <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl mb-6">
+                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-10 h-10 bg-white/5 rounded-lg text-xl text-orange-500 font-black">-</button>
+                                    <span className="font-tech text-xl text-white">{modalPedido.pedido_cant}</span>
+                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-10 h-10 bg-white/5 rounded-lg text-xl text-orange-500 font-black">+</button>
                                 </div>
-                                <div className="flex items-center justify-between bg-white/5 p-3 rounded-3xl mb-10 border border-white/5">
-                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-14 h-14 bg-white/5 rounded-2xl text-2xl text-orange-500 font-black">-</button>
-                                    <div className="flex flex-col"><span className="font-tech text-3xl font-black text-white">{modalPedido.pedido_cant}</span><span className="text-[8px] font-black uppercase text-slate-500">Pzs</span></div>
-                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-14 h-14 bg-white/5 rounded-2xl text-2xl text-orange-500 font-black">+</button>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => setModalPedido(null)} className="flex-1 py-5 rounded-2xl font-black uppercase text-[10px] bg-slate-800 text-slate-400">Cancelar</button>
-                                    <button onClick={async () => {
-                                        if(!modalPedido.user_name || !modalPedido.job) return alert("DEBES PONER TU NOMBRE Y TRABAJO");
-                                        await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
-                                        setModalPedido(null);
-                                        showMsg("SOLICITUD ENVIADA CORRECTAMENTE");
-                                    }} className="flex-[2] bg-orange-600 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 shadow-orange-600/20">Confirmar</button>
-                                </div>
+                                <button onClick={async () => {
+                                    if(!modalPedido.user_name || !modalPedido.job) return alert("DATOS INCOMPLETOS");
+                                    await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
+                                    setModalPedido(null); showMsg("SOLICITUD ENVIADA");
+                                }} className="w-full bg-orange-600 py-3 rounded-xl font-black uppercase text-[10px]">Confirmar</button>
                             </div>
                         </div>
                     )}
 
-                    {/* LOGIN ADMIN */}
+                    {/* LOGIN REDUCIDO */}
                     {mostrarLogin && (
-                        <div className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
-                            <div className="glass p-10 rounded-[3rem] w-full max-w-[280px] text-center relative shadow-2xl">
+                        <div className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="glass p-8 rounded-[2rem] w-full max-w-[240px] text-center relative">
                                 <div className="btn-x" onClick={() => setMostrarLogin(false)}>✕</div>
-                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8 italic">Password de Admin</div>
-                                <input type="password" placeholder="CLAVE" className="w-full p-5 rounded-2xl text-center text-3xl outline-none font-tech text-orange-500" autoFocus 
-                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), showMsg("ACCESO CONCEDIDO"))} />
+                                <input type="password" placeholder="CLAVE" className="w-full p-4 rounded-xl text-center text-2xl font-tech text-orange-500" autoFocus 
+                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), showMsg("HOLA ADMIN"))} />
                             </div>
                         </div>
                     )}
