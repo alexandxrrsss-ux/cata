@@ -3,31 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Pro v27</title>
+    <title>StockMaster Elite v28</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        :root { --orange: #f97316; --dark: #020617; }
+        body { background: var(--dark); color: #f8fafc; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .font-tech { font-family: 'Orbitron', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-        .tab-active { background: #f97316 !important; color: white !important; }
         
+        /* Glassmorphism Ultra */
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.08); }
+        .glass-card { background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(255,255,255,0.05); }
+        
+        .tab-active { background: var(--orange) !important; color: white !important; box-shadow: 0 0 20px rgba(249, 115, 22, 0.4); }
+        
+        /* Loaders */
         .loader-spin {
-            border: 3px solid rgba(249, 115, 22, 0.1); border-top: 3px solid #f97316;
-            border-radius: 50%; width: 25px; height: 25px; animation: spin 0.8s linear infinite;
+            border: 3px solid rgba(249, 115, 22, 0.1); border-top: 3px solid var(--orange);
+            border-radius: 50%; width: 30px; height: 30px; animation: spin 0.8s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .btn-close {
-            position: absolute; top: -15px; right: -15px; width: 35px; height: 35px;
+        /* Estilos de botones de cierre */
+        .btn-x {
+            position: absolute; top: -12px; right: -12px; width: 32px; height: 32px;
             background: #ef4444; color: white; border-radius: 50%; display: flex;
-            align-items: center; justify-content: center; font-weight: bold; font-size: 18px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 100; cursor: pointer;
+            align-items: center; justify-content: center; font-weight: 900;
+            box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4); z-index: 50; cursor: pointer;
         }
+
+        .img-pro-box {
+            position: relative; width: 100%; height: 140px; background: #000;
+            border-radius: 1.2rem; overflow: hidden; display: flex; align-items: center; justify-content: center;
+        }
+
+        /* Input Styles */
+        input { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; transition: all 0.3s; }
+        input:focus { border-color: var(--orange) !important; box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2); }
     </style>
 </head>
 <body>
@@ -40,13 +56,15 @@
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const ADMIN_PASSWORD = "123";
 
-        const ImageWithLoader = ({ src, className = "" }) => {
+        // Componente de Imagen con Cargador Real
+        const ProImage = ({ src, alt, className = "" }) => {
             const [loading, setLoading] = useState(true);
             return (
-                <div className={`relative bg-black/40 rounded-2xl overflow-hidden flex items-center justify-center ${className}`}>
-                    {loading && <div className="absolute inset-0 flex items-center justify-center z-10"><div className="loader-spin"></div></div>}
-                    <img src={src || 'https://via.placeholder.com/150'} onLoad={() => setLoading(false)}
-                        className={`w-full h-full object-contain p-2 transition-opacity ${loading ? 'opacity-0' : 'opacity-100'}`} />
+                <div className={`img-pro-box ${className}`}>
+                    {loading && <div className="absolute inset-0 flex items-center justify-center"><div className="loader-spin"></div></div>}
+                    <img src={src || 'https://via.placeholder.com/150'} alt={alt}
+                        onLoad={() => setLoading(false)}
+                        className={`w-full h-full object-contain p-2 transition-opacity duration-500 ${loading ? 'opacity-0' : 'opacity-100'}`} />
                 </div>
             );
         };
@@ -56,9 +74,10 @@
             const [seccion, setSeccion] = useState('stock');
             const [busqueda, setBusqueda] = useState('');
             const [isAdmin, setIsAdmin] = useState(false);
-            const [form, setForm] = useState(null); // Para Editar/Agregar
-            const [modalPedido, setModalPedido] = useState(null); // Para Solicitar
-            const [subiendoImg, setSubiendoImg] = useState(false);
+            const [mostrarLogin, setMostrarLogin] = useState(false);
+            const [modalPedido, setModalPedido] = useState(null);
+            const [form, setForm] = useState(null);
+            const [isUploading, setIsUploading] = useState(false);
 
             const fetchData = useCallback(async () => {
                 const [h, p, hi] = await Promise.all([
@@ -71,159 +90,210 @@
 
             useEffect(() => {
                 fetchData();
-                const sub = supabase.channel('any').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
+                const sub = supabase.channel('pro-sync').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
                 return () => supabase.removeChannel(sub);
             }, [fetchData]);
 
-            // FUNCIÓN PARA SUBIR IMAGEN (NUEVA O EDICIÓN)
-            const handleImageProcess = async (e) => {
+            const handleFile = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                setSubiendoImg(true);
-                const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
-                
-                const { data: uploadData, error } = await supabase.storage.from('fotos').upload(fileName, file);
-                
-                if (error) {
-                    alert("Error al subir imagen");
-                    setSubiendoImg(false);
-                    return;
+                setIsUploading(true);
+                const name = `${Date.now()}_${file.name}`;
+                const { error } = await supabase.storage.from('fotos').upload(name, file);
+                if (!error) {
+                    const { data: { publicUrl } } = supabase.storage.from('fotos').getPublicUrl(name);
+                    setForm({ ...form, foto_url: publicUrl });
                 }
-
-                const { data: { publicUrl } } = supabase.storage.from('fotos').getPublicUrl(fileName);
-                setForm(prev => ({ ...prev, foto_url: publicUrl }));
-                setSubiendoImg(false);
+                setIsUploading(false);
             };
 
-            const saveTool = async () => {
-                if(!form.nombre || !form.foto_url) return alert("Nombre y Foto son obligatorios");
-                if (form.id) {
-                    await supabase.from('herramientas').update(form).eq('id', form.id);
-                } else {
-                    await supabase.from('herramientas').insert([form]);
-                }
-                setForm(null);
-            };
-
-            const deleteTool = async (id) => {
-                if(confirm("¿Seguro que quieres eliminar este material?")) {
-                    await supabase.from('herramientas').delete().eq('id', id);
-                    setForm(null);
-                }
-            };
+            const filtrarStock = data.herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase()));
 
             return (
-                <div className="min-h-screen pb-20 px-4">
-                    <header className="py-6 max-w-[1200px] mx-auto flex flex-col items-center sticky top-0 z-40 bg-[#020617]/90 backdrop-blur-xl">
-                        <h1 className="font-tech font-black text-xl mb-4 tracking-tighter uppercase">Stock<span className="text-orange-500">Master</span></h1>
-                        <div className="flex gap-1 glass p-1 rounded-2xl">
-                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
-                            {isAdmin && <button onClick={() => setSeccion('historial')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : (()=>{
-                                const p = prompt("CLAVE ADMIN:");
-                                if(p === ADMIN_PASSWORD) setIsAdmin(true);
-                            })()} className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase bg-white/5">{isAdmin ? 'Salir' : 'Admin'}</button>
+                <div className="min-h-screen pb-24">
+                    <header className="py-8 sticky top-0 z-40 glass px-6 flex flex-col items-center">
+                        <div className="font-tech font-black text-2xl tracking-[0.2em] mb-6">
+                            STOCK<span className="text-orange-500">PRO</span>
+                        </div>
+                        <div className="flex gap-2 p-1.5 glass rounded-2xl border border-white/5">
+                            <button onClick={() => setSeccion('stock')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
+                            {isAdmin && (
+                                <>
+                                    <button onClick={() => setSeccion('pedidos')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({data.pedidos.length})</button>
+                                    <button onClick={() => setSeccion('historial')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
+                                </>
+                            )}
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase bg-white/5 border border-white/10">{isAdmin ? 'Salir' : 'Admin'}</button>
                         </div>
                     </header>
 
-                    <main className="max-w-[1200px] mx-auto">
+                    <main className="max-w-[1400px] mx-auto p-6 mt-4">
                         {seccion === 'stock' && (
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                {isAdmin && (
-                                    <div onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="glass rounded-[2rem] border-dashed border-2 border-orange-500/30 flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-orange-500/5">
-                                        <span className="text-4xl text-orange-500 mb-2">+</span>
-                                        <span className="text-[10px] font-black uppercase text-orange-500">Nuevo Material</span>
-                                    </div>
-                                )}
-                                {data.herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase())).map(h => (
-                                    <div key={h.id} className="glass rounded-[2rem] p-3 flex flex-col border-white/5 relative">
-                                        <ImageWithLoader src={h.foto_url} className="h-32 mb-2" />
-                                        <h3 className="text-[10px] font-black uppercase text-center h-8 flex items-center justify-center leading-tight mb-2">{h.nombre}</h3>
-                                        <div className="flex justify-between items-center mb-4 px-2">
-                                            <span className="text-[9px] font-tech text-orange-500">{h.cantidad} PZ</span>
-                                            <span className="text-[8px] text-slate-500 uppercase">{h.lugar}</span>
+                            <>
+                                <div className="flex gap-3 mb-10">
+                                    <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 p-5 rounded-2xl font-bold uppercase text-[11px] tracking-widest outline-none shadow-inner" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, unidad: 'PZ', lugar: '', foto_url: '' })} className="bg-orange-600 px-8 rounded-2xl font-black text-2xl shadow-lg shadow-orange-600/20 active:scale-90 transition-transform">+</button>}
+                                </div>
+
+                                <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
+                                    {filtrarStock.map(h => (
+                                        <div key={h.id} className="glass-card rounded-[2.5rem] p-4 flex flex-col group transition-all hover:border-orange-500/30">
+                                            <ProImage src={h.foto_url} alt={h.nombre} />
+                                            <h3 className="text-[11px] font-black uppercase text-center mt-4 mb-2 h-10 flex items-center justify-center leading-tight px-2">{h.nombre}</h3>
+                                            <div className="flex justify-between items-center px-2 mb-5">
+                                                <span className="text-[9px] font-bold text-slate-500 tracking-tighter uppercase">{h.lugar || 'Bodega'}</span>
+                                                <span className="text-orange-500 font-tech text-xs font-bold">{h.cantidad} PZ</span>
+                                            </div>
+                                            <button onClick={() => isAdmin ? setForm(h) : setModalPedido({...h, pedido_cant: 1, user_name: '', job: ''})} 
+                                                className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 ${isAdmin ? 'bg-slate-700 text-white' : 'bg-orange-600 text-white'}`}>
+                                                {isAdmin ? '🔧 Gestionar' : '🛒 Solicitar'}
+                                            </button>
                                         </div>
-                                        <button onClick={() => isAdmin ? setForm(h) : setModalPedido(h)} className={`w-full py-3 rounded-xl font-black text-[9px] uppercase ${isAdmin ? 'bg-slate-700' : 'bg-orange-600'}`}>
-                                            {isAdmin ? 'Editar' : 'Solicitar'}
-                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        {seccion === 'historial' && (
+                            <div className="glass rounded-[2.5rem] overflow-hidden border border-white/5">
+                                {data.historial.map(hi => (
+                                    <div key={hi.id} className="flex items-center gap-6 p-5 border-b border-white/5 hover:bg-white/5 transition-colors">
+                                        <div className="w-16 h-16 shrink-0 bg-black rounded-2xl border border-white/10 overflow-hidden">
+                                            <img src={hi.foto_url} className="w-full h-full object-contain p-1" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-orange-500 font-black text-xs uppercase truncate">{hi.herramienta_nombre}</p>
+                                            <p className="text-white text-[10px] font-semibold uppercase">{hi.usuario}</p>
+                                            <p className="text-slate-500 text-[9px] font-medium mt-1 uppercase">{new Date(hi.fecha).toLocaleString()}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-tech text-white text-lg font-black">-{hi.cantidad}</div>
+                                            <div className="text-[8px] text-slate-500 font-black tracking-widest uppercase">Egresado</div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {seccion === 'historial' && (
-                            <div className="glass rounded-3xl overflow-hidden divide-y divide-white/5">
-                                {data.historial.map(hi => (
-                                    <div key={hi.id} className="flex items-center gap-4 p-4">
-                                        <img src={hi.foto_url} className="w-12 h-12 rounded-lg bg-black object-contain" />
-                                        <div className="flex-1">
-                                            <p className="text-orange-500 font-black text-[10px] uppercase">{hi.herramienta_nombre}</p>
-                                            <p className="text-white text-[9px] font-bold uppercase">{hi.usuario} • {new Date(hi.fecha).toLocaleDateString()}</p>
+                        {seccion === 'pedidos' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {data.pedidos.map(p => (
+                                    <div key={p.id} className="glass p-5 rounded-[2rem] flex items-center gap-6 border-l-[6px] border-orange-600 shadow-2xl relative">
+                                        <button onClick={async () => await supabase.from('pedidos').delete().eq('id', p.id)} className="absolute top-4 right-4 text-slate-600 hover:text-red-500 font-black">X</button>
+                                        <ProImage src={p.foto_url} className="w-20 h-20 bg-black/40 border border-white/5" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-black text-orange-500 text-xs uppercase truncate mb-1">{p.herramienta_nombre}</p>
+                                            <p className="text-white text-[10px] font-bold uppercase">{p.usuario_nombre}</p>
+                                            <p className="text-slate-400 text-[9px] uppercase italic mb-2">Ref: {p.tarea}</p>
+                                            <div className="font-tech text-white font-black text-lg">{p.cantidad_pedida} PZ</div>
                                         </div>
-                                        <div className="font-tech text-white text-sm">-{hi.cantidad}</div>
+                                        <button onClick={async () => {
+                                            const h = data.herramientas.find(i => i.id === p.herramienta_id);
+                                            if(!h || h.cantidad < p.cantidad_pedida) return alert("ERROR: STOCK INSUFICIENTE");
+                                            await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
+                                            await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
+                                            await supabase.from('pedidos').delete().eq('id', p.id);
+                                        }} className="bg-green-600 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-green-600/20 active:scale-95">Despachar</button>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </main>
 
-                    {/* MODAL EDITAR / AGREGAR (ADMIN) */}
+                    {/* MODAL ADMIN (PRO VERSION) */}
                     {form && (
-                        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 backdrop-blur-md">
-                            <div className="glass p-8 rounded-[2.5rem] w-full max-w-sm relative">
-                                <div className="btn-close" onClick={() => setForm(null)}>✕</div>
-                                <h2 className="text-center font-black text-orange-500 uppercase text-xs mb-6">Datos del Material</h2>
+                        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
+                            <div className="glass p-10 rounded-[3.5rem] w-full max-w-sm relative shadow-2xl border-white/10">
+                                <div className="btn-x shadow-red-500/40" onClick={() => setForm(null)}>✕</div>
+                                <h2 className="text-center font-black text-orange-500 uppercase tracking-[0.3em] text-sm mb-10 italic">Editor Material</h2>
                                 
-                                <div className="flex flex-col items-center gap-4 mb-6">
-                                    <div className="w-32 h-32 bg-black/60 rounded-3xl overflow-hidden relative">
-                                        {subiendoImg ? (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-20"><div className="loader-spin"></div></div>
-                                        ) : null}
+                                <div className="flex flex-col items-center gap-6 mb-8">
+                                    <div className="w-40 h-40 bg-black rounded-[2rem] border border-white/10 overflow-hidden relative shadow-2xl group">
+                                        {isUploading && <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20"><div className="loader-spin"></div></div>}
                                         <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
+                                        <label className="absolute inset-0 bg-orange-600/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all cursor-pointer font-black text-[10px] uppercase">
+                                            Cambiar Imagen
+                                            <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+                                        </label>
                                     </div>
-                                    <label className="bg-white/10 px-4 py-2 rounded-xl text-[9px] font-black uppercase cursor-pointer hover:bg-orange-500/20 transition-colors border border-white/10">
-                                        {form.foto_url ? 'Cambiar Imagen' : 'Subir Imagen'}
-                                        <input type="file" accept="image/*" className="hidden" onChange={handleImageProcess} />
-                                    </label>
                                 </div>
 
-                                <div className="space-y-3">
-                                    <input type="text" placeholder="NOMBRE" className="w-full bg-slate-900 p-4 rounded-xl font-bold uppercase text-[10px] border border-white/5" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
-                                    <input type="number" placeholder="STOCK" className="w-full bg-slate-900 p-4 rounded-xl font-bold text-[10px] border border-white/5" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
-                                    <input type="text" placeholder="UBICACIÓN" className="w-full bg-slate-900 p-4 rounded-xl font-bold uppercase text-[10px] border border-white/5" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="NOMBRE DEL MATERIAL" className="w-full p-5 rounded-2xl font-bold uppercase text-[10px] tracking-widest" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input type="number" placeholder="STOCK" className="w-full p-5 rounded-2xl font-bold text-[10px]" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
+                                        <input type="text" placeholder="BODEGA/UBIC" className="w-full p-5 rounded-2xl font-bold uppercase text-[10px]" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                    </div>
                                 </div>
 
-                                <div className="mt-8 flex gap-2">
-                                    {form.id && <button onClick={() => deleteTool(form.id)} className="bg-red-500/20 text-red-500 p-4 rounded-xl">🗑</button>}
-                                    <button onClick={saveTool} className="flex-1 bg-orange-600 py-4 rounded-xl font-black uppercase text-[10px]">Guardar Cambios</button>
+                                <div className="mt-10 flex gap-3">
+                                    {form.id && <button onClick={async () => {
+                                        if(confirm("¿Eliminar este material?")) {
+                                            await supabase.from('herramientas').delete().eq('id', form.id);
+                                            setForm(null);
+                                        }
+                                    }} className="bg-red-500/10 text-red-500 px-6 rounded-2xl border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">🗑</button>}
+                                    <button onClick={async () => {
+                                        if(!form.nombre || !form.foto_url) return alert("DATOS INCOMPLETOS");
+                                        if(form.id) await supabase.from('herramientas').update(form).eq('id', form.id);
+                                        else await supabase.from('herramientas').insert([form]);
+                                        setForm(null);
+                                    }} className="flex-1 bg-orange-600 py-5 rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-lg shadow-orange-600/30">Guardar Material</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL SOLICITAR (USUARIO) */}
+                    {/* MODAL PEDIDO (REDISEÑO VISUAL) */}
                     {modalPedido && (
-                        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-6">
-                            <div className="glass p-8 rounded-[3rem] w-full max-w-xs text-center relative border border-orange-500/20">
-                                <div className="btn-close" onClick={() => setModalPedido(null)}>✕</div>
-                                <ImageWithLoader src={modalPedido.foto_url} className="h-32 mb-4" />
-                                <h3 className="font-black text-orange-500 uppercase text-[11px] mb-6">{modalPedido.nombre}</h3>
-                                <div className="space-y-2 mb-6">
-                                    <input type="text" placeholder="TU NOMBRE" className="w-full bg-slate-900 p-4 rounded-2xl text-center font-bold uppercase text-[10px]" onChange={e => setModalPedido({...modalPedido, user: e.target.value})} />
-                                    <input type="text" placeholder="ACTIVIDAD" className="w-full bg-slate-900 p-4 rounded-2xl text-center font-bold uppercase text-[10px]" onChange={e => setModalPedido({...modalPedido, task: e.target.value})} />
+                        <div className="fixed inset-0 z-[60] bg-black/98 flex items-center justify-center p-6">
+                            <div className="glass p-10 rounded-[3.5rem] w-full max-w-sm relative text-center border-orange-500/20 shadow-[0_0_100px_rgba(249,115,22,0.1)]">
+                                <div className="btn-x" onClick={() => setModalPedido(null)}>✕</div>
+                                <ProImage src={modalPedido.foto_url} className="h-40 mb-8 border border-white/5" />
+                                <h2 className="font-black text-orange-500 uppercase text-xs mb-8 tracking-widest">{modalPedido.nombre}</h2>
+                                
+                                <div className="space-y-3 mb-8">
+                                    <input type="text" placeholder="¿QUIÉN RECIBE?" className="w-full p-5 rounded-2xl text-center font-bold uppercase text-[10px] tracking-widest" onChange={e => setModalPedido({...modalPedido, user_name: e.target.value})} />
+                                    <input type="text" placeholder="ACTIVIDAD / TRABAJO" className="w-full p-5 rounded-2xl text-center font-bold uppercase text-[10px] tracking-widest" onChange={e => setModalPedido({...modalPedido, job: e.target.value})} />
                                 </div>
-                                <button onClick={async () => {
-                                    if(!modalPedido.user || !modalPedido.task) return alert("Faltan datos");
-                                    await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user, tarea: modalPedido.task, cantidad_pedida: 1, foto_url: modalPedido.foto_url }]);
-                                    setModalPedido(null);
-                                    alert("Pedido Enviado!");
-                                }} className="w-full bg-orange-600 py-4 rounded-2xl font-black uppercase text-[10px]">Confirmar Pedido</button>
+
+                                <div className="flex items-center justify-between bg-white/5 p-3 rounded-3xl mb-10 border border-white/5 shadow-inner">
+                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-14 h-14 bg-white/5 rounded-2xl text-2xl text-orange-500 font-black">-</button>
+                                    <div className="flex flex-col">
+                                        <span className="font-tech text-3xl font-black text-white">{modalPedido.pedido_cant}</span>
+                                        <span className="text-[8px] font-black uppercase text-slate-500 tracking-tighter">Piezas</span>
+                                    </div>
+                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-14 h-14 bg-white/5 rounded-2xl text-2xl text-orange-500 font-black">+</button>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <button onClick={() => setModalPedido(null)} className="flex-1 py-5 rounded-2xl font-black uppercase text-[10px] bg-slate-800 text-slate-400">Cancelar</button>
+                                    <button onClick={async () => {
+                                        if(!modalPedido.user_name || !modalPedido.job) return alert("FALTAN DATOS DE SOLICITANTE");
+                                        await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
+                                        setModalPedido(null);
+                                        alert("SOLICITUD ENVIADA CORRECTAMENTE");
+                                    }} className="flex-[2] bg-orange-600 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-orange-600/20 active:scale-95">Confirmar Pedido</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* LOGIN ADMIN */}
+                    {mostrarLogin && (
+                        <div className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
+                            <div className="glass p-10 rounded-[3rem] w-full max-w-[280px] text-center relative shadow-2xl">
+                                <div className="btn-x" onClick={() => setMostrarLogin(false)}>✕</div>
+                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8">Acceso de Seguridad</div>
+                                <input type="password" placeholder="CLAVE" className="w-full p-5 rounded-2xl text-center text-3xl outline-none font-tech text-orange-500" autoFocus 
+                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false))} />
                             </div>
                         </div>
                     )}
                 </div>
             );
         }
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
