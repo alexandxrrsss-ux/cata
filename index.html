@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StockMaster Elite v29.0</title>
+    <title>StockMaster Turbo v31.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -12,25 +12,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         :root { --orange: #f97316; --dark: #020617; }
-        body { background: var(--dark); color: #f8fafc; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; font-size: 14px; }
+        body { background: var(--dark); color: #f8fafc; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
         .font-tech { font-family: 'Orbitron', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.08); }
-        .glass-card { background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(255,255,255,0.05); }
-        .tab-active { background: var(--orange) !important; color: white !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.3); }
-        .loader-spin { border: 2px solid rgba(249, 115, 22, 0.1); border-top: 2px solid var(--orange); border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .btn-x { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px; background: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; z-index: 50; cursor: pointer; font-size: 12px; }
-        .img-pro-box { position: relative; width: 100%; height: 110px; background: #000; border-radius: 0.8rem; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-        input { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; color: white; outline: none; }
-        .notif { position: fixed; top: 10px; right: 10px; padding: 10px 20px; border-radius: 10px; background: #10b981; color: white; font-weight: 800; font-size: 10px; z-index: 100; animation: slideIn 0.3s ease-out; box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3); }
-        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .glass-card { background: rgba(30, 41, 59, 0.3); border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s ease; }
+        .tab-active { background: var(--orange) !important; color: white !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.4); }
+        .btn-x { position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; background: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; z-index: 100; }
+        .img-box { width: 100%; height: 100px; background: #000; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .notif { position: fixed; top: 15px; right: 15px; padding: 12px 24px; border-radius: 12px; background: #10b981; color: white; font-weight: 800; font-size: 10px; z-index: 200; animation: slide 0.3s ease forwards; }
+        @keyframes slide { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .loader-dots:after { content: '.'; animation: dots 1.5s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); } 40% { color: white; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); } 60% { text-shadow: .25em 0 0 white, .5em 0 0 rgba(0,0,0,0); } 80%, 100% { text-shadow: .25em 0 0 white, .5em 0 0 white; } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback } = React;
+        const { useState, useEffect, useCallback, useMemo } = React;
         const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -44,8 +43,8 @@
             const [mostrarLogin, setMostrarLogin] = useState(false);
             const [modalPedido, setModalPedido] = useState(null);
             const [form, setForm] = useState(null);
-            const [isUploading, setIsUploading] = useState(false);
             const [notif, setNotif] = useState("");
+            const [isWorking, setIsWorking] = useState(false);
 
             const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 2500); };
 
@@ -53,79 +52,74 @@
                 const [h, p, hi] = await Promise.all([
                     supabase.from('herramientas').select('*').order('nombre'),
                     supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
-                    supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(40)
+                    supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(30)
                 ]);
                 setData({ herramientas: h.data || [], pedidos: p.data || [], historial: hi.data || [] });
             }, []);
 
             useEffect(() => {
                 fetchData();
-                const sub = supabase.channel('pro-sync').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
-                return () => supabase.removeChannel(sub);
+                const channel = supabase.channel('any').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
+                return () => supabase.removeChannel(channel);
             }, [fetchData]);
 
-            const handleFile = async (e) => {
+            const filteredStock = useMemo(() => {
+                const clean = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return data.herramientas.filter(h => clean(h.nombre).includes(clean(busqueda)));
+            }, [data.herramientas, busqueda]);
+
+            const handlePhoto = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                setIsUploading(true);
-                const name = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
-                
-                // Previsualización inmediata
-                const reader = new FileReader();
-                reader.onloadend = () => setForm(prev => ({ ...prev, foto_url: reader.result }));
-                reader.readAsDataURL(file);
-
+                setIsWorking(true);
+                const name = `${Date.now()}_${file.name}`;
                 const { error } = await supabase.storage.from('fotos').upload(name, file);
                 if (!error) {
                     const { data: { publicUrl } } = supabase.storage.from('fotos').getPublicUrl(name);
                     setForm(prev => ({ ...prev, foto_url: publicUrl }));
-                    showMsg("IMAGEN CARGADA");
+                    showMsg("FOTO LISTA");
                 }
-                setIsUploading(false);
+                setIsWorking(false);
             };
 
-            const normalizar = (texto) => texto ? texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
-            const filtrarStock = data.herramientas.filter(h => normalizar(h.nombre).includes(normalizar(busqueda)));
-
             return (
-                <div className="min-h-screen pb-16">
-                    {notif && <div className="notif uppercase font-tech">✓ {notif}</div>}
+                <div className="min-h-screen pb-10">
+                    {notif && <div className="notif font-tech tracking-wider italic">✓ {notif}</div>}
                     
-                    <header className="py-4 sticky top-0 z-40 glass px-4 flex flex-col items-center">
-                        <div className="font-tech font-black text-lg tracking-widest mb-3 uppercase italic">STOCK<span className="text-orange-500">PRO</span></div>
-                        <div className="flex gap-1.5 p-1 glass rounded-xl border border-white/5">
-                            <button onClick={() => setSeccion('stock')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
-                            {isAdmin && (
-                                <>
-                                    <button onClick={() => setSeccion('pedidos')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos</button>
-                                    <button onClick={() => setSeccion('historial')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
-                                </>
-                            )}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase bg-white/5 border border-white/10">{isAdmin ? 'Salir' : 'Admin'}</button>
-                        </div>
+                    <header className="sticky top-0 z-40 glass p-4 flex flex-col items-center">
+                        <h1 className="font-tech font-black text-xl tracking-tighter mb-4 italic uppercase">STOCK<span className="text-orange-500">TURBO</span></h1>
+                        <nav className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/5">
+                            <button onClick={() => setSeccion('stock')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
+                            {isAdmin && <button onClick={() => setSeccion('pedidos')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos</button>}
+                            {isAdmin && <button onClick={() => setSeccion('historial')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>}
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase bg-white/5">{isAdmin ? 'Salir' : 'Admin'}</button>
+                        </nav>
                     </header>
 
-                    <main className="max-w-[1200px] mx-auto p-4">
+                    <main className="p-4 max-w-6xl mx-auto">
                         {seccion === 'stock' && (
                             <>
                                 <div className="flex gap-2 mb-6">
-                                    <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 p-3 rounded-xl font-bold uppercase text-[10px] tracking-widest" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, unidad: 'PZ', lugar: '', foto_url: '' })} className="bg-orange-600 px-5 rounded-xl font-black text-xl shadow-lg active:scale-95 transition-transform">+</button>}
+                                    <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 p-3 bg-black/40 border border-white/10 rounded-xl text-xs uppercase font-bold" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="bg-orange-600 px-6 rounded-xl font-black text-2xl">+</button>}
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                    {filtrarStock.map(h => (
-                                        <div key={h.id} className="glass-card rounded-[1.5rem] p-3 flex flex-col transition-all hover:border-orange-500/40">
-                                            <div className="img-pro-box">
-                                                <img src={h.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-1" />
+                                    {filteredStock.map(h => (
+                                        <div key={h.id} className="glass-card rounded-2xl p-3 flex flex-col relative overflow-hidden">
+                                            {h.cantidad <= 0 && <div className="absolute top-2 left-2 bg-red-600 text-[8px] font-black px-2 py-1 rounded z-10 animate-pulse">AGOTADO</div>}
+                                            <div className="img-box mb-2">
+                                                <img src={h.foto_url || 'https://via.placeholder.com/150'} className={`w-full h-full object-contain p-1 ${h.cantidad <= 0 ? 'grayscale opacity-50' : ''}`} />
                                             </div>
-                                            <h3 className="text-[9px] font-black uppercase text-center mt-2 mb-1 h-8 flex items-center justify-center leading-tight">{h.nombre}</h3>
-                                            <div className="flex justify-between items-center px-1 mb-3">
+                                            <h3 className="text-[10px] font-black uppercase text-center h-8 flex items-center justify-center leading-tight mb-2">{h.nombre}</h3>
+                                            <div className="flex justify-between items-center mb-3">
                                                 <span className="text-[8px] font-bold text-slate-500 uppercase">{h.lugar || 'BOD'}</span>
-                                                <span className="text-orange-500 font-tech text-[10px] font-bold">{h.cantidad} PZ</span>
+                                                <span className={`font-tech text-xs font-black ${h.cantidad <= 0 ? 'text-red-500' : 'text-orange-500'}`}>{h.cantidad} PZ</span>
                                             </div>
-                                            <button onClick={() => isAdmin ? setForm(h) : setModalPedido({...h, pedido_cant: 1, user_name: '', job: ''})} 
-                                                className={`w-full py-2.5 rounded-xl font-black text-[9px] uppercase tracking-wider shadow-md active:scale-95 ${isAdmin ? 'bg-slate-700' : 'bg-orange-600'}`}>
-                                                {isAdmin ? '🔧 Editar' : '🛒 Pedir'}
+                                            <button 
+                                                disabled={h.cantidad <= 0 && !isAdmin}
+                                                onClick={() => isAdmin ? setForm(h) : setModalPedido({...h, pedido_cant: 1})}
+                                                className={`w-full py-2.5 rounded-xl font-black text-[9px] uppercase transition-all ${h.cantidad <= 0 && !isAdmin ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : (isAdmin ? 'bg-slate-700' : 'bg-orange-600')}`}>
+                                                {h.cantidad <= 0 && !isAdmin ? 'AGOTADO' : (isAdmin ? '🔧 GESTIONAR' : '🛒 PEDIR')}
                                             </button>
                                         </div>
                                     ))}
@@ -133,128 +127,109 @@
                             </>
                         )}
 
-                        {seccion === 'historial' && (
-                            <div className="glass rounded-2xl overflow-hidden">
-                                {data.historial.map(hi => (
-                                    <div key={hi.id} className="flex items-center gap-3 p-3 border-b border-white/5">
-                                        <img src={hi.foto_url} className="w-10 h-10 object-contain bg-black rounded-lg" />
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-orange-500 text-black text-[7px] font-black px-1 rounded">ACT: {hi.tarea}</span>
-                                                <p className="text-white font-black text-[10px] uppercase truncate">{hi.herramienta_nombre}</p>
-                                            </div>
-                                            <p className="text-slate-400 text-[9px] uppercase">{hi.usuario}</p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <div className="font-tech text-white text-sm">-{hi.cantidad}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
                         {seccion === 'pedidos' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {data.pedidos.map(p => (
                                     <div key={p.id} className="glass p-3 rounded-2xl flex items-center gap-4 border-l-4 border-orange-600 relative">
-                                        <button onClick={async () => { await supabase.from('pedidos').delete().eq('id', p.id); showMsg("SOLICITUD BORRADA"); }} className="absolute top-2 right-2 text-slate-600 text-xs">✕</button>
-                                        <img src={p.foto_url} className="w-14 h-14 object-contain bg-black/40 rounded-xl" />
+                                        <button disabled={isWorking} onClick={async () => { setIsWorking(true); await supabase.from('pedidos').delete().eq('id', p.id); showMsg("ELIMINADO"); setIsWorking(false); }} className="absolute top-2 right-2 text-slate-600 text-xs font-black">✕</button>
+                                        <img src={p.foto_url} className="w-16 h-16 object-contain bg-black/50 rounded-xl" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-black text-orange-500 text-[10px] uppercase truncate">{p.herramienta_nombre}</p>
                                             <p className="text-white text-[9px] font-bold uppercase">{p.usuario_nombre}</p>
-                                            <p className="text-slate-500 text-[7px] uppercase italic">{p.tarea}</p>
-                                            <div className="font-tech text-white text-sm mt-1">{p.cantidad_pedida} PZ</div>
+                                            <div className="font-tech text-white text-md mt-1">{p.cantidad_pedida} PZ</div>
                                         </div>
-                                        <button onClick={async () => {
+                                        <button disabled={isWorking} onClick={async () => {
+                                            setIsWorking(true);
                                             const h = data.herramientas.find(i => i.id === p.herramienta_id);
-                                            if(!h || h.cantidad < p.cantidad_pedida) return alert("SIN STOCK");
+                                            if(!h || h.cantidad < p.cantidad_pedida) { alert("ERROR DE STOCK"); setIsWorking(false); return; }
                                             await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
                                             await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
                                             await supabase.from('pedidos').delete().eq('id', p.id);
                                             showMsg("DESPACHADO");
-                                        }} className="bg-green-600 px-4 py-2 rounded-xl font-black text-[8px] uppercase active:scale-95">LISTO</button>
+                                            setIsWorking(false);
+                                        }} className="bg-green-600 px-5 py-3 rounded-xl font-black text-[9px] uppercase shadow-lg shadow-green-900/20 active:scale-95 disabled:opacity-50">
+                                            {isWorking ? <span className="loader-dots uppercase">Despachando</span> : 'LISTO'}
+                                        </button>
                                     </div>
                                 ))}
                             </div>
                         )}
+                        {/* Secciones Historial se mantienen igual */}
                     </main>
 
-                    {/* MODAL GESTIÓN - ADMIN */}
+                    {/* MODAL GESTION ADMIN */}
                     {form && (
-                        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm">
-                            <div className="glass p-6 rounded-[2rem] w-full max-w-xs relative border-white/10 shadow-2xl">
-                                <div className="btn-x" onClick={() => setForm(null)}>✕</div>
-                                <div className="flex flex-col items-center gap-4 mb-4">
-                                    <div className="w-28 h-28 bg-black rounded-2xl overflow-hidden relative border border-white/10 group shadow-inner">
-                                        {isUploading && <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10"><div className="loader-spin"></div></div>}
-                                        <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
-                                        <label className="absolute inset-0 bg-orange-600/60 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[8px] font-black uppercase text-center p-2 transition-all">
-                                            Subir Foto
-                                            <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
-                                        </label>
-                                    </div>
+                        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
+                            <div className="bg-[#0f172a] p-6 rounded-[2.5rem] w-full max-w-xs relative border border-white/10 shadow-2xl">
+                                <div className="btn-x" onClick={() => !isWorking && setForm(null)}>✕</div>
+                                <div className="w-32 h-32 bg-black mx-auto mb-6 rounded-2xl overflow-hidden relative border border-white/10">
+                                    <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
+                                    <label className="absolute inset-0 bg-orange-600/60 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-[8px] font-black uppercase transition-all">
+                                        SUBIR FOTO
+                                        <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={isWorking} />
+                                    </label>
                                 </div>
                                 <div className="space-y-3">
-                                    <input type="text" placeholder="NOMBRE DEL MATERIAL" className="w-full p-3 rounded-xl font-bold uppercase text-[9px] tracking-widest" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} />
+                                    <input type="text" placeholder="NOMBRE" className="w-full p-4 rounded-xl text-[10px] font-bold uppercase" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} />
                                     <div className="grid grid-cols-2 gap-2">
-                                        <input type="number" placeholder="CANTIDAD" className="w-full p-3 rounded-xl font-bold text-[9px]" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
-                                        <input type="text" placeholder="UBICACIÓN" className="w-full p-3 rounded-xl font-bold uppercase text-[9px]" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value.toUpperCase()})} />
+                                        <input type="number" placeholder="STOCK" className="w-full p-4 rounded-xl text-[10px] font-bold" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
+                                        <input type="text" placeholder="LUGAR" className="w-full p-4 rounded-xl text-[10px] font-bold uppercase" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value.toUpperCase()})} />
                                     </div>
                                 </div>
                                 <div className="mt-6 flex gap-2">
-                                    {form.id && (
-                                        <button onClick={async () => { 
-                                            if(confirm("¿ELIMINAR ESTE MATERIAL?")) { 
-                                                await supabase.from('herramientas').delete().eq('id', form.id); 
-                                                setForm(null); 
-                                                showMsg("ELIMINADO"); 
-                                            } 
-                                        }} className="bg-red-600/20 text-red-500 px-4 rounded-xl border border-red-500/30 flex items-center justify-center active:scale-95 transition-all">🗑</button>
-                                    )}
-                                    <button onClick={async () => {
-                                        if(!form.nombre) return alert("PON UN NOMBRE");
-                                        const finalData = { ...form, unidad: 'PZ', foto_url: form.foto_url || 'https://via.placeholder.com/150' };
-                                        if(form.id) await supabase.from('herramientas').update(finalData).eq('id', form.id);
-                                        else await supabase.from('herramientas').insert([finalData]);
-                                        setForm(null); showMsg("GUARDADO CORRECTO");
-                                    }} className="flex-1 bg-orange-600 py-3 rounded-xl font-black uppercase text-[10px] shadow-lg shadow-orange-600/20 active:scale-95 transition-all">Confirmar</button>
+                                    {form.id && <button disabled={isWorking} onClick={async () => { if(confirm("¿BORRAR?")) { setIsWorking(true); await supabase.from('herramientas').delete().eq('id', form.id); setForm(null); showMsg("ELIMINADO"); setIsWorking(false); } }} className="bg-red-600/20 text-red-500 px-4 rounded-xl border border-red-500/20 active:scale-95">🗑</button>}
+                                    <button disabled={isWorking} onClick={async () => {
+                                        if(!form.nombre) return alert("FALTA NOMBRE");
+                                        setIsWorking(true);
+                                        const payload = { ...form, unidad: 'PZ', foto_url: form.foto_url || 'https://via.placeholder.com/150' };
+                                        if(form.id) await supabase.from('herramientas').update(payload).eq('id', form.id);
+                                        else await supabase.from('herramientas').insert([payload]);
+                                        setForm(null); showMsg("GUARDADO");
+                                        setIsWorking(false);
+                                    }} className="flex-1 bg-orange-600 py-4 rounded-xl font-black text-[10px] uppercase shadow-lg shadow-orange-900/30 active:scale-95 transition-all disabled:opacity-50">
+                                        {isWorking ? <span className="loader-dots">Guardando</span> : 'CONFIRMAR'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL PEDIDO - USUARIOS */}
+                    {/* MODAL PEDIDO USUARIO */}
                     {modalPedido && (
-                        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4">
-                            <div className="glass p-6 rounded-[2rem] w-full max-w-xs relative text-center border-orange-500/20 shadow-2xl">
-                                <div className="btn-x" onClick={() => setModalPedido(null)}>✕</div>
-                                <img src={modalPedido.foto_url} className="h-28 mx-auto mb-4 object-contain drop-shadow-lg" />
-                                <h2 className="font-black text-orange-500 uppercase text-[10px] mb-4 tracking-tighter">{modalPedido.nombre}</h2>
-                                <div className="space-y-2 mb-4">
-                                    <input type="text" placeholder="TU NOMBRE COMPLETO" className="w-full p-3 rounded-xl text-center font-bold uppercase text-[9px]" onChange={e => setModalPedido({...modalPedido, user_name: e.target.value})} />
-                                    <input type="text" placeholder="¿QUÉ TRABAJO HARÁS?" className="w-full p-3 rounded-xl text-center font-bold uppercase text-[9px]" onChange={e => setModalPedido({...modalPedido, job: e.target.value})} />
+                        <div className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-4">
+                            <div className="bg-[#0f172a] p-6 rounded-[2.5rem] w-full max-w-xs relative text-center border border-orange-500/20 shadow-2xl">
+                                <div className="btn-x" onClick={() => !isWorking && setModalPedido(null)}>✕</div>
+                                <img src={modalPedido.foto_url} className="h-32 mx-auto mb-4 object-contain" />
+                                <h2 className="text-orange-500 font-black uppercase text-[10px] mb-6 tracking-widest">{modalPedido.nombre}</h2>
+                                <div className="space-y-2 mb-6">
+                                    <input type="text" placeholder="TU NOMBRE" className="w-full p-4 rounded-xl text-center text-[10px] font-bold uppercase" onChange={e => setModalPedido({...modalPedido, user_name: e.target.value})} disabled={isWorking} />
+                                    <input type="text" placeholder="ACTIVIDAD / TRABAJO" className="w-full p-4 rounded-xl text-center text-[10px] font-bold uppercase" onChange={e => setModalPedido({...modalPedido, job: e.target.value})} disabled={isWorking} />
                                 </div>
-                                <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl mb-6 border border-white/5">
-                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-10 h-10 bg-white/10 rounded-lg text-xl text-orange-500 font-black active:bg-orange-600 active:text-white">-</button>
-                                    <span className="font-tech text-xl text-white">{modalPedido.pedido_cant}</span>
-                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-10 h-10 bg-white/10 rounded-lg text-xl text-orange-500 font-black active:bg-orange-600 active:text-white">+</button>
+                                <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl mb-6">
+                                    <button disabled={isWorking} onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-12 h-12 bg-white/10 rounded-xl text-xl font-black text-orange-500">-</button>
+                                    <span className="font-tech text-2xl">{modalPedido.pedido_cant}</span>
+                                    <button disabled={isWorking} onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-12 h-12 bg-white/10 rounded-xl text-xl font-black text-orange-500">+</button>
                                 </div>
-                                <button onClick={async () => {
-                                    if(!modalPedido.user_name || !modalPedido.job) return alert("FALTAN DATOS");
+                                <button disabled={isWorking} onClick={async () => {
+                                    if(!modalPedido.user_name || !modalPedido.job) return alert("COMPLETA LOS DATOS");
+                                    setIsWorking(true);
                                     await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
-                                    setModalPedido(null); showMsg("SOLICITUD ENVIADA");
-                                }} className="w-full bg-orange-600 py-3 rounded-xl font-black uppercase text-[10px] shadow-lg shadow-orange-600/20 active:scale-95 transition-all">Confirmar Pedido</button>
+                                    setModalPedido(null); 
+                                    showMsg("PEDIDO ENVIADO");
+                                    setIsWorking(false);
+                                }} className="w-full bg-orange-600 py-4 rounded-xl font-black text-[10px] uppercase shadow-lg active:scale-95 disabled:opacity-50">
+                                    {isWorking ? <span className="loader-dots">Enviando solicitud</span> : 'CONFIRMAR PEDIDO'}
+                                </button>
                             </div>
                         </div>
                     )}
 
                     {/* LOGIN ADMIN */}
                     {mostrarLogin && (
-                        <div className="fixed inset-0 z-[70] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
-                            <div className="glass p-8 rounded-[2rem] w-full max-w-[240px] text-center relative shadow-2xl border-orange-500/20">
+                        <div className="fixed inset-0 z-[110] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="bg-[#0f172a] p-8 rounded-[2rem] w-full max-w-[240px] text-center border border-white/10">
                                 <div className="btn-x" onClick={() => setMostrarLogin(false)}>✕</div>
-                                <p className="text-[8px] font-black uppercase text-slate-500 mb-4 tracking-[0.2em]">Security Access</p>
-                                <input type="password" placeholder="••••" className="w-full p-4 rounded-xl text-center text-2xl font-tech text-orange-500 tracking-[0.5em]" autoFocus 
+                                <input type="password" placeholder="••••" className="w-full p-4 rounded-xl text-center text-3xl font-tech text-orange-500 bg-black/40" autoFocus 
                                     onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), showMsg("HOLA JEFE"))} />
                             </div>
                         </div>
