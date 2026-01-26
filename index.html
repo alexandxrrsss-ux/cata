@@ -3,33 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StockMaster Turbo v31.0</title>
+    <title>StockMaster Turbo v32.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         :root { --orange: #f97316; --dark: #020617; }
         body { background: var(--dark); color: #f8fafc; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
         .font-tech { font-family: 'Orbitron', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .glass-card { background: rgba(30, 41, 59, 0.3); border: 1px solid rgba(255,255,255,0.05); transition: all 0.2s ease; }
-        .tab-active { background: var(--orange) !important; color: white !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.4); }
-        .btn-x { position: absolute; top: -10px; right: -10px; width: 30px; height: 30px; background: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; z-index: 100; }
-        .img-box { width: 100%; height: 100px; background: #000; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-        .notif { position: fixed; top: 15px; right: 15px; padding: 12px 24px; border-radius: 12px; background: #10b981; color: white; font-weight: 800; font-size: 10px; z-index: 200; animation: slide 0.3s ease forwards; }
-        @keyframes slide { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .loader-dots:after { content: '.'; animation: dots 1.5s steps(5, end) infinite; }
-        @keyframes dots { 0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); } 40% { color: white; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0); } 60% { text-shadow: .25em 0 0 white, .5em 0 0 rgba(0,0,0,0); } 80%, 100% { text-shadow: .25em 0 0 white, .5em 0 0 white; } }
+        .glass { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .glass-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.1s; }
+        .tab-active { background: var(--orange) !important; color: white !important; box-shadow: 0 0 20px rgba(249, 115, 22, 0.5); }
+        .btn-x { position: absolute; top: -10px; right: -10px; width: 32px; height: 32px; background: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .notif { position: fixed; top: 20px; right: 20px; padding: 15px 30px; border-radius: 12px; background: #10b981; color: white; font-weight: 900; font-size: 11px; z-index: 200; animation: slideIn 0.3s ease-out forwards; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); }
+        @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
+        .loading-shimmer { background: linear-gradient(90deg, #f97316 25%, #fb923c 50%, #f97316 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        input { background: rgba(0,0,0,0.5) !important; border: 1px solid rgba(255,255,255,0.2) !important; color: white !important; }
+        input:focus { border-color: #f97316 !important; outline: none; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback, useMemo } = React;
+        const { useState, useEffect, useCallback } = React;
         const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -46,9 +47,10 @@
             const [notif, setNotif] = useState("");
             const [isWorking, setIsWorking] = useState(false);
 
-            const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 2500); };
+            const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 3000); };
 
-            const fetchData = useCallback(async () => {
+            // MOTOR REALTIME 100% ACTIVO
+            const sync = useCallback(async () => {
                 const [h, p, hi] = await Promise.all([
                     supabase.from('herramientas').select('*').order('nombre'),
                     supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
@@ -58,17 +60,14 @@
             }, []);
 
             useEffect(() => {
-                fetchData();
-                const channel = supabase.channel('any').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
+                sync();
+                const channel = supabase.channel('db-changes')
+                    .on('postgres_changes', { event: '*', schema: 'public' }, () => sync())
+                    .subscribe();
                 return () => supabase.removeChannel(channel);
-            }, [fetchData]);
+            }, [sync]);
 
-            const filteredStock = useMemo(() => {
-                const clean = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                return data.herramientas.filter(h => clean(h.nombre).includes(clean(busqueda)));
-            }, [data.herramientas, busqueda]);
-
-            const handlePhoto = async (e) => {
+            const handleUpload = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 setIsWorking(true);
@@ -77,49 +76,49 @@
                 if (!error) {
                     const { data: { publicUrl } } = supabase.storage.from('fotos').getPublicUrl(name);
                     setForm(prev => ({ ...prev, foto_url: publicUrl }));
-                    showMsg("FOTO LISTA");
+                    showMsg("FOTO CARGADA CON ÉXITO");
                 }
                 setIsWorking(false);
             };
 
             return (
-                <div className="min-h-screen pb-10">
-                    {notif && <div className="notif font-tech tracking-wider italic">✓ {notif}</div>}
+                <div className="min-h-screen pb-20">
+                    {notif && <div className="notif font-tech uppercase tracking-widest">✓ {notif}</div>}
                     
-                    <header className="sticky top-0 z-40 glass p-4 flex flex-col items-center">
-                        <h1 className="font-tech font-black text-xl tracking-tighter mb-4 italic uppercase">STOCK<span className="text-orange-500">TURBO</span></h1>
-                        <nav className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/5">
-                            <button onClick={() => setSeccion('stock')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
-                            {isAdmin && <button onClick={() => setSeccion('pedidos')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos</button>}
-                            {isAdmin && <button onClick={() => setSeccion('historial')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase bg-white/5">{isAdmin ? 'Salir' : 'Admin'}</button>
+                    <header className="sticky top-0 z-40 glass p-4 flex flex-col items-center shadow-2xl">
+                        <div className="font-tech font-black text-2xl tracking-tighter mb-4 italic uppercase">STOCK<span className="text-orange-500 italic">PRO</span></div>
+                        <nav className="flex gap-2 p-1.5 bg-white/5 rounded-2xl border border-white/10">
+                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
+                            {isAdmin && <button onClick={() => setSeccion('pedidos')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({data.pedidos.length})</button>}
+                            {isAdmin && <button onClick={() => setSeccion('historial')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>}
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-5 py-2 rounded-xl text-[10px] font-black uppercase bg-white/10 border border-white/5">{isAdmin ? 'Salir' : 'Admin'}</button>
                         </nav>
                     </header>
 
-                    <main className="p-4 max-w-6xl mx-auto">
+                    <main className="p-4 max-w-7xl mx-auto">
                         {seccion === 'stock' && (
                             <>
-                                <div className="flex gap-2 mb-6">
-                                    <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 p-3 bg-black/40 border border-white/10 rounded-xl text-xs uppercase font-bold" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="bg-orange-600 px-6 rounded-xl font-black text-2xl">+</button>}
+                                <div className="flex gap-3 mb-8">
+                                    <input type="text" placeholder="ESCRIBE PARA BUSCAR..." className="flex-1 p-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-inner" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="bg-orange-600 px-7 rounded-2xl font-black text-3xl shadow-lg active:scale-90 transition-transform">+</button>}
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                    {filteredStock.map(h => (
-                                        <div key={h.id} className="glass-card rounded-2xl p-3 flex flex-col relative overflow-hidden">
-                                            {h.cantidad <= 0 && <div className="absolute top-2 left-2 bg-red-600 text-[8px] font-black px-2 py-1 rounded z-10 animate-pulse">AGOTADO</div>}
-                                            <div className="img-box mb-2">
-                                                <img src={h.foto_url || 'https://via.placeholder.com/150'} className={`w-full h-full object-contain p-1 ${h.cantidad <= 0 ? 'grayscale opacity-50' : ''}`} />
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                    {data.herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase())).map(h => (
+                                        <div key={h.id} className="glass-card rounded-[2rem] p-4 flex flex-col relative group">
+                                            {h.cantidad <= 0 && <div className="absolute top-3 left-3 bg-red-600 text-[8px] font-black px-2 py-1 rounded-md z-10">AGOTADO</div>}
+                                            <div className="w-full h-32 bg-black/40 rounded-2xl mb-3 flex items-center justify-center overflow-hidden">
+                                                <img src={h.foto_url || 'https://via.placeholder.com/150'} className={`w-full h-full object-contain p-2 ${h.cantidad <= 0 ? 'grayscale' : ''}`} />
                                             </div>
-                                            <h3 className="text-[10px] font-black uppercase text-center h-8 flex items-center justify-center leading-tight mb-2">{h.nombre}</h3>
-                                            <div className="flex justify-between items-center mb-3">
-                                                <span className="text-[8px] font-bold text-slate-500 uppercase">{h.lugar || 'BOD'}</span>
+                                            <h3 className="text-[10px] font-black uppercase text-center h-10 flex items-center justify-center leading-tight mb-2 px-1">{h.nombre}</h3>
+                                            <div className="flex justify-between items-center mb-4 px-1">
+                                                <span className="text-[8px] font-bold text-slate-500 uppercase">{h.lugar || 'BODEGA'}</span>
                                                 <span className={`font-tech text-xs font-black ${h.cantidad <= 0 ? 'text-red-500' : 'text-orange-500'}`}>{h.cantidad} PZ</span>
                                             </div>
                                             <button 
                                                 disabled={h.cantidad <= 0 && !isAdmin}
-                                                onClick={() => isAdmin ? setForm(h) : setModalPedido({...h, pedido_cant: 1})}
-                                                className={`w-full py-2.5 rounded-xl font-black text-[9px] uppercase transition-all ${h.cantidad <= 0 && !isAdmin ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : (isAdmin ? 'bg-slate-700' : 'bg-orange-600')}`}>
-                                                {h.cantidad <= 0 && !isAdmin ? 'AGOTADO' : (isAdmin ? '🔧 GESTIONAR' : '🛒 PEDIR')}
+                                                onClick={() => isAdmin ? setForm(h) : setModalPedido({...h, user_name: '', job: '', pedido_cant: 1})}
+                                                className={`w-full py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 ${h.cantidad <= 0 && !isAdmin ? 'bg-slate-800 text-slate-600' : (isAdmin ? 'bg-slate-700' : 'bg-orange-600')}`}>
+                                                {h.cantidad <= 0 && !isAdmin ? 'SIN STOCK' : (isAdmin ? 'Gestionar' : 'Pedir')}
                                             </button>
                                         </div>
                                     ))}
@@ -128,97 +127,119 @@
                         )}
 
                         {seccion === 'pedidos' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {data.pedidos.map(p => (
-                                    <div key={p.id} className="glass p-3 rounded-2xl flex items-center gap-4 border-l-4 border-orange-600 relative">
-                                        <button disabled={isWorking} onClick={async () => { setIsWorking(true); await supabase.from('pedidos').delete().eq('id', p.id); showMsg("ELIMINADO"); setIsWorking(false); }} className="absolute top-2 right-2 text-slate-600 text-xs font-black">✕</button>
-                                        <img src={p.foto_url} className="w-16 h-16 object-contain bg-black/50 rounded-xl" />
+                                    <div key={p.id} className="glass p-5 rounded-[2.5rem] flex items-center gap-5 border-l-[6px] border-orange-600 relative shadow-xl">
+                                        <button disabled={isWorking} onClick={async () => { setIsWorking(true); await supabase.from('pedidos').delete().eq('id', p.id); showMsg("SOLICITUD RECHAZADA"); setIsWorking(false); }} className="absolute top-4 right-4 text-slate-500 font-black">✕</button>
+                                        <img src={p.foto_url} className="w-20 h-20 object-contain bg-black/50 rounded-2xl shadow-lg" />
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-black text-orange-500 text-[10px] uppercase truncate">{p.herramienta_nombre}</p>
-                                            <p className="text-white text-[9px] font-bold uppercase">{p.usuario_nombre}</p>
-                                            <div className="font-tech text-white text-md mt-1">{p.cantidad_pedida} PZ</div>
+                                            <p className="font-black text-orange-500 text-xs uppercase truncate mb-1">{p.herramienta_nombre}</p>
+                                            <p className="text-white text-[10px] font-bold uppercase mb-1">{p.usuario_nombre}</p>
+                                            <p className="text-slate-500 text-[8px] font-black uppercase italic truncate mb-2">{p.tarea}</p>
+                                            <div className="font-tech text-white text-xl">{p.cantidad_pedida} PZ</div>
                                         </div>
                                         <button disabled={isWorking} onClick={async () => {
                                             setIsWorking(true);
                                             const h = data.herramientas.find(i => i.id === p.herramienta_id);
-                                            if(!h || h.cantidad < p.cantidad_pedida) { alert("ERROR DE STOCK"); setIsWorking(false); return; }
+                                            if(!h || h.cantidad < p.cantidad_pedida) { alert("ERROR: STOCK INSUFICIENTE"); setIsWorking(false); return; }
                                             await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
                                             await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
                                             await supabase.from('pedidos').delete().eq('id', p.id);
-                                            showMsg("DESPACHADO");
+                                            showMsg("DESPACHADO CON ÉXITO");
                                             setIsWorking(false);
-                                        }} className="bg-green-600 px-5 py-3 rounded-xl font-black text-[9px] uppercase shadow-lg shadow-green-900/20 active:scale-95 disabled:opacity-50">
-                                            {isWorking ? <span className="loader-dots uppercase">Despachando</span> : 'LISTO'}
+                                        }} className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 ${isWorking ? 'loading-shimmer' : 'bg-green-600'}`}>
+                                            {isWorking ? '...' : 'Listo'}
                                         </button>
                                     </div>
                                 ))}
                             </div>
                         )}
-                        {/* Secciones Historial se mantienen igual */}
+
+                        {seccion === 'historial' && (
+                            <div className="glass rounded-[2rem] overflow-hidden border border-white/5">
+                                {data.historial.map(hi => (
+                                    <div key={hi.id} className="flex items-center gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                                        <img src={hi.foto_url} className="w-12 h-12 object-contain bg-black rounded-xl" />
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="bg-orange-500 text-black text-[8px] font-black px-1.5 rounded uppercase">TRABAJO: {hi.tarea}</span>
+                                                <p className="text-white font-black text-[10px] uppercase">{hi.herramienta_nombre}</p>
+                                            </div>
+                                            <p className="text-slate-400 text-[9px] uppercase font-bold tracking-widest">{hi.usuario} • {new Date(hi.fecha).toLocaleString()}</p>
+                                        </div>
+                                        <div className="font-tech text-white text-lg">-{hi.cantidad}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </main>
 
-                    {/* MODAL GESTION ADMIN */}
+                    {/* MODAL GESTION ADMIN (NUEVO O EDITAR) */}
                     {form && (
-                        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
-                            <div className="bg-[#0f172a] p-6 rounded-[2.5rem] w-full max-w-xs relative border border-white/10 shadow-2xl">
+                        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
+                            <div className="bg-[#0f172a] p-10 rounded-[3rem] w-full max-w-sm relative border border-white/10 shadow-2xl">
                                 <div className="btn-x" onClick={() => !isWorking && setForm(null)}>✕</div>
-                                <div className="w-32 h-32 bg-black mx-auto mb-6 rounded-2xl overflow-hidden relative border border-white/10">
+                                <div className="w-40 h-40 bg-black mx-auto mb-8 rounded-[2rem] overflow-hidden relative border border-white/10 shadow-inner group">
                                     <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
-                                    <label className="absolute inset-0 bg-orange-600/60 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer text-[8px] font-black uppercase transition-all">
-                                        SUBIR FOTO
-                                        <input type="file" accept="image/*" className="hidden" onChange={handlePhoto} disabled={isWorking} />
+                                    <label className="absolute inset-0 bg-orange-600/70 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[10px] font-black uppercase text-center p-4 transition-all">
+                                        TOCA PARA SUBIR FOTO
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={isWorking} />
                                     </label>
                                 </div>
-                                <div className="space-y-3">
-                                    <input type="text" placeholder="NOMBRE" className="w-full p-4 rounded-xl text-[10px] font-bold uppercase" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} />
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <input type="number" placeholder="STOCK" className="w-full p-4 rounded-xl text-[10px] font-bold" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
-                                        <input type="text" placeholder="LUGAR" className="w-full p-4 rounded-xl text-[10px] font-bold uppercase" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value.toUpperCase()})} />
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="NOMBRE DEL MATERIAL" className="w-full p-5 rounded-2xl text-[10px] font-black uppercase tracking-widest" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input type="number" placeholder="STOCK" className="w-full p-5 rounded-2xl text-[10px] font-black" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
+                                        <input type="text" placeholder="UBICACIÓN" className="w-full p-5 rounded-2xl text-[10px] font-black uppercase tracking-widest" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value.toUpperCase()})} />
                                     </div>
                                 </div>
-                                <div className="mt-6 flex gap-2">
-                                    {form.id && <button disabled={isWorking} onClick={async () => { if(confirm("¿BORRAR?")) { setIsWorking(true); await supabase.from('herramientas').delete().eq('id', form.id); setForm(null); showMsg("ELIMINADO"); setIsWorking(false); } }} className="bg-red-600/20 text-red-500 px-4 rounded-xl border border-red-500/20 active:scale-95">🗑</button>}
+                                <div className="mt-8 flex gap-3">
+                                    {form.id && <button disabled={isWorking} onClick={async () => { if(confirm("¿ELIMINAR DEFINITIVAMENTE?")) { setIsWorking(true); await supabase.from('herramientas').delete().eq('id', form.id); setForm(null); showMsg("ELIMINADO"); setIsWorking(false); } }} className="bg-red-600/20 text-red-500 px-6 rounded-2xl border border-red-500/20 active:scale-95 transition-all">🗑</button>}
                                     <button disabled={isWorking} onClick={async () => {
-                                        if(!form.nombre) return alert("FALTA NOMBRE");
+                                        if(!form.nombre) return alert("EL NOMBRE ES OBLIGATORIO");
                                         setIsWorking(true);
                                         const payload = { ...form, unidad: 'PZ', foto_url: form.foto_url || 'https://via.placeholder.com/150' };
                                         if(form.id) await supabase.from('herramientas').update(payload).eq('id', form.id);
                                         else await supabase.from('herramientas').insert([payload]);
-                                        setForm(null); showMsg("GUARDADO");
+                                        setForm(null); showMsg("DATOS GUARDADOS");
                                         setIsWorking(false);
-                                    }} className="flex-1 bg-orange-600 py-4 rounded-xl font-black text-[10px] uppercase shadow-lg shadow-orange-900/30 active:scale-95 transition-all disabled:opacity-50">
-                                        {isWorking ? <span className="loader-dots">Guardando</span> : 'CONFIRMAR'}
+                                    }} className={`flex-1 py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-lg shadow-orange-900/40 active:scale-95 transition-all ${isWorking ? 'loading-shimmer' : 'bg-orange-600'}`}>
+                                        {isWorking ? 'GUARDANDO...' : 'CONFIRMAR'}
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL PEDIDO USUARIO */}
+                    {/* MODAL PEDIDO USUARIO - ¡CORREGIDO! */}
                     {modalPedido && (
-                        <div className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-4">
-                            <div className="bg-[#0f172a] p-6 rounded-[2.5rem] w-full max-w-xs relative text-center border border-orange-500/20 shadow-2xl">
+                        <div className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-6 backdrop-blur-md">
+                            <div className="bg-[#0f172a] p-8 rounded-[3rem] w-full max-w-sm relative text-center border border-orange-500/30 shadow-2xl">
                                 <div className="btn-x" onClick={() => !isWorking && setModalPedido(null)}>✕</div>
-                                <img src={modalPedido.foto_url} className="h-32 mx-auto mb-4 object-contain" />
-                                <h2 className="text-orange-500 font-black uppercase text-[10px] mb-6 tracking-widest">{modalPedido.nombre}</h2>
-                                <div className="space-y-2 mb-6">
-                                    <input type="text" placeholder="TU NOMBRE" className="w-full p-4 rounded-xl text-center text-[10px] font-bold uppercase" onChange={e => setModalPedido({...modalPedido, user_name: e.target.value})} disabled={isWorking} />
-                                    <input type="text" placeholder="ACTIVIDAD / TRABAJO" className="w-full p-4 rounded-xl text-center text-[10px] font-bold uppercase" onChange={e => setModalPedido({...modalPedido, job: e.target.value})} disabled={isWorking} />
+                                <img src={modalPedido.foto_url} className="h-32 mx-auto mb-6 object-contain drop-shadow-2xl" />
+                                <h2 className="text-orange-500 font-black uppercase text-xs mb-8 tracking-[0.2em]">{modalPedido.nombre}</h2>
+                                <div className="space-y-3 mb-8">
+                                    <input type="text" placeholder="¿QUIÉN RECIBE?" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase tracking-widest" value={modalPedido.user_name} onChange={e => setModalPedido({...modalPedido, user_name: e.target.value.toUpperCase()})} disabled={isWorking} />
+                                    <input type="text" placeholder="¿PARA QUÉ TRABAJO?" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase tracking-widest" value={modalPedido.job} onChange={e => setModalPedido({...modalPedido, job: e.target.value.toUpperCase()})} disabled={isWorking} />
                                 </div>
-                                <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl mb-6">
-                                    <button disabled={isWorking} onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-12 h-12 bg-white/10 rounded-xl text-xl font-black text-orange-500">-</button>
-                                    <span className="font-tech text-2xl">{modalPedido.pedido_cant}</span>
-                                    <button disabled={isWorking} onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-12 h-12 bg-white/10 rounded-xl text-xl font-black text-orange-500">+</button>
+                                <div className="flex items-center justify-between bg-white/5 p-3 rounded-[2rem] mb-8 border border-white/10 shadow-inner">
+                                    <button disabled={isWorking} onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500 active:bg-orange-600 active:text-white">-</button>
+                                    <div className="flex flex-col"><span className="font-tech text-3xl text-white">{modalPedido.pedido_cant}</span><span className="text-[8px] font-black text-slate-500 uppercase">Cantidad</span></div>
+                                    <button disabled={isWorking} onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500 active:bg-orange-600 active:text-white">+</button>
                                 </div>
                                 <button disabled={isWorking} onClick={async () => {
-                                    if(!modalPedido.user_name || !modalPedido.job) return alert("COMPLETA LOS DATOS");
+                                    if(!modalPedido.user_name || !modalPedido.job) return alert("POR FAVOR LLENA TODOS LOS CAMPOS");
                                     setIsWorking(true);
-                                    await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
-                                    setModalPedido(null); 
-                                    showMsg("PEDIDO ENVIADO");
+                                    const { error } = await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
+                                    if(!error) {
+                                        setModalPedido(null); 
+                                        showMsg("SOLICITUD ENVIADA AL ADMIN");
+                                    } else {
+                                        alert("ERROR AL ENVIAR");
+                                    }
                                     setIsWorking(false);
-                                }} className="w-full bg-orange-600 py-4 rounded-xl font-black text-[10px] uppercase shadow-lg active:scale-95 disabled:opacity-50">
-                                    {isWorking ? <span className="loader-dots">Enviando solicitud</span> : 'CONFIRMAR PEDIDO'}
+                                }} className={`w-full py-5 rounded-[2rem] font-black text-[11px] uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all ${isWorking ? 'loading-shimmer' : 'bg-orange-600'}`}>
+                                    {isWorking ? 'ENVIANDO SOLICITUD...' : 'CONFIRMAR PEDIDO'}
                                 </button>
                             </div>
                         </div>
@@ -226,11 +247,12 @@
 
                     {/* LOGIN ADMIN */}
                     {mostrarLogin && (
-                        <div className="fixed inset-0 z-[110] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm">
-                            <div className="bg-[#0f172a] p-8 rounded-[2rem] w-full max-w-[240px] text-center border border-white/10">
+                        <div className="fixed inset-0 z-[110] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
+                            <div className="bg-[#0f172a] p-10 rounded-[3rem] w-full max-w-[280px] text-center border border-white/10 shadow-2xl">
                                 <div className="btn-x" onClick={() => setMostrarLogin(false)}>✕</div>
-                                <input type="password" placeholder="••••" className="w-full p-4 rounded-xl text-center text-3xl font-tech text-orange-500 bg-black/40" autoFocus 
-                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), showMsg("HOLA JEFE"))} />
+                                <p className="text-[9px] font-black uppercase text-slate-500 mb-8 tracking-[0.3em]">Acceso Restringido</p>
+                                <input type="password" placeholder="••••" className="w-full p-5 rounded-2xl text-center text-4xl font-tech text-orange-500 tracking-[0.4em] bg-black/60 border-none outline-none shadow-inner" autoFocus 
+                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), showMsg("ACCESO CONCEDIDO, BIENVENIDO"))} />
                             </div>
                         </div>
                     )}
