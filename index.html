@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Pro v22 - 5 Columns & Fixed Layout</title>
+    <title>StockMaster Pro v23 - Fixed Admin & History</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; overflow-x: hidden; }
@@ -17,59 +16,31 @@
         .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
         .tab-active { background: #f97316 !important; color: white !important; }
         
-        /* CONTENEDOR DE IMAGEN CON ALTURA RÍGIDA */
         .img-container { 
-            position: relative; 
-            background: #0f172a; 
-            width: 100%; 
-            height: 120px; /* Altura fija para que NO crezca */
-            border-radius: 1rem; 
-            overflow: hidden; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 10px; /* Separación forzada del nombre */
+            position: relative; background: #0f172a; width: 100%; height: 120px; 
+            border-radius: 1rem; overflow: hidden; display: flex;
+            align-items: center; justify-content: center; margin-bottom: 10px; 
+        }
+
+        .nombre-material { 
+            font-weight: 900; font-size: 11px; line-height: 1.2; color: #ffffff;
+            text-transform: uppercase; height: 40px; display: flex;
+            align-items: center; justify-content: center; text-align: center;
+            width: 100%; margin-bottom: 8px;
+        }
+
+        .grid-master {
+            display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        @media (min-width: 1024px) {
+            .grid-master { grid-template-columns: repeat(5, minmax(0, 1fr)); }
         }
 
         .loader-mini { 
-            position: absolute;
-            border: 3px solid rgba(249, 115, 22, 0.1); 
-            border-top: 3px solid #f97316; 
-            border-radius: 50%; 
-            width: 25px; 
-            height: 25px; 
-            animation: spin 0.8s linear infinite; 
+            border: 3px solid rgba(249, 115, 22, 0.1); border-top: 3px solid #f97316; 
+            border-radius: 50%; width: 25px; height: 25px; animation: spin 0.8s linear infinite; 
         }
-
-        /* NOMBRE CON ESPACIO PROTEGIDO */
-        .nombre-material { 
-            font-weight: 900; 
-            font-size: 11px;
-            line-height: 1.2;
-            color: #ffffff;
-            text-transform: uppercase;
-            height: 40px; /* Altura fija para el texto: nunca se encoge ni se tapa */
-            display: flex;
-            align-items: center; /* Centra el texto verticalmente en su área */
-            justify-content: center;
-            text-align: center;
-            width: 100%;
-            margin-bottom: 8px;
-        }
-
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Cuadrícula de 5 columnas para pantallas grandes */
-        .grid-master {
-            display: grid;
-            gap: 12px;
-            grid-template-columns: repeat(2, minmax(0, 1fr)); /* Celular: 2 col */
-        }
-        @media (min-width: 1024px) {
-            .grid-master {
-                grid-template-columns: repeat(5, minmax(0, 1fr)); /* PC: 5 col */
-            }
-        }
     </style>
 </head>
 <body>
@@ -105,7 +76,7 @@
             const [mostrarLogin, setMostrarLogin] = useState(false);
             const [cargando, setCargando] = useState(false);
             const [modalPedido, setModalPedido] = useState(null);
-            const [form, setForm] = useState(null);
+            const [form, setForm] = useState(null); // Formulario para editar o crear
             const [pedidoForm, setPedidoForm] = useState({ usuario: '', tarea: '', cantidad: 1 });
 
             const fetchData = useCallback(async () => {
@@ -148,22 +119,21 @@
                             <>
                                 <div className="flex gap-3 mb-8">
                                     <input type="text" placeholder="BUSCAR..." className="flex-1 bg-slate-900 border border-white/10 p-4 rounded-2xl outline-none focus:border-orange-500 text-sm font-bold uppercase" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, unidad: 'PZ', lugar: '' })} className="bg-orange-600 px-8 rounded-2xl font-black text-2xl shadow-lg shadow-orange-500/20">+</button>}
+                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, unidad: 'PZ', lugar: '', foto_url: '' })} className="bg-orange-600 px-8 rounded-2xl font-black text-2xl shadow-lg shadow-orange-500/20">+</button>}
                                 </div>
 
                                 <div className="grid-master">
                                     {filtrarStock.map(h => (
                                         <div key={h.id} className="glass rounded-[2rem] p-3 flex flex-col border-white/5 hover:border-orange-500/30 transition-all">
                                             <SmartImage src={h.foto_url} agotado={h.cantidad <= 0} />
-                                            
                                             <h3 className="nombre-material">{h.nombre}</h3>
-                                            
                                             <div className="flex justify-between items-center mb-4 px-2">
                                                 <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{h.lugar || 'BODEGA'}</span>
                                                 <span className="text-orange-500 font-tech text-xs font-black">{h.cantidad} PZ</span>
                                             </div>
-
-                                            <button onClick={() => isAdmin ? setForm(h) : setModalPedido(h)} disabled={h.cantidad <= 0 && !isAdmin}
+                                            <button 
+                                                onClick={() => isAdmin ? setForm(h) : setModalPedido(h)} 
+                                                disabled={h.cantidad <= 0 && !isAdmin}
                                                 className={`w-full py-3.5 rounded-xl font-black text-[9px] uppercase tracking-tighter transition-all ${isAdmin ? 'bg-slate-800' : 'bg-orange-600'} disabled:opacity-20 active:scale-95`}>
                                                 {isAdmin ? '🔧 Editar' : '🛒 Solicitar'}
                                             </button>
@@ -173,43 +143,27 @@
                             </>
                         )}
 
-                        {/* SECCIÓN PEDIDOS (IGUAL QUE ANTES) */}
-                        {seccion === 'pedidos' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {data.pedidos.map(p => (
-                                    <div key={p.id} className="glass p-5 rounded-3xl flex items-center gap-4 border-l-4 border-orange-600">
-                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 flex-shrink-0">
-                                            <img src={p.foto_url} className="w-full h-full object-contain" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-black text-[10px] text-orange-500 uppercase truncate">{p.herramienta_nombre}</p>
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase truncate">{p.usuario_nombre}</p>
-                                            <p className="font-tech text-xs mt-1">{p.cantidad_pedida} PZ</p>
-                                        </div>
-                                        <button onClick={async () => {
-                                            const h = data.herramientas.find(i => i.id === p.herramienta_id);
-                                            if(!h || h.cantidad < p.cantidad_pedida) return alert("NO HAY STOCK");
-                                            setCargando(true);
-                                            await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
-                                            await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
-                                            await supabase.from('pedidos').delete().eq('id', p.id);
-                                            setCargando(false);
-                                        }} className="bg-green-600 px-4 py-2 rounded-xl font-black text-[8px] uppercase">Listo</button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* SECCIÓN HISTORIAL (IGUAL QUE ANTES) */}
+                        {/* SECCIÓN HISTORIAL CON IMAGEN CORREGIDA */}
                         {seccion === 'historial' && (
                             <div className="glass rounded-3xl overflow-hidden overflow-x-auto">
                                 <table className="w-full text-[10px] uppercase">
                                     <thead className="bg-slate-900 text-slate-500 font-black">
-                                        <tr><th className="p-4 text-left">Material</th><th className="p-4 text-left">Usuario</th><th className="p-4 text-center">Cant</th><th className="p-4 text-right">Fecha</th></tr>
+                                        <tr>
+                                            <th className="p-4 text-left">Foto</th>
+                                            <th className="p-4 text-left">Material</th>
+                                            <th className="p-4 text-left">Usuario</th>
+                                            <th className="p-4 text-center">Cant</th>
+                                            <th className="p-4 text-right">Fecha</th>
+                                        </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
                                         {data.historial.map(hi => (
                                             <tr key={hi.id} className="hover:bg-white/5 transition-colors">
+                                                <td className="p-4">
+                                                    <div className="w-10 h-10 rounded-lg bg-slate-800 overflow-hidden border border-white/10">
+                                                        <img src={hi.foto_url} className="w-full h-full object-contain" />
+                                                    </div>
+                                                </td>
                                                 <td className="p-4 font-bold text-slate-200">{hi.herramienta_nombre}</td>
                                                 <td className="p-4 text-slate-400 font-bold">{hi.usuario}</td>
                                                 <td className="p-4 text-center font-tech text-orange-500">{hi.cantidad}</td>
@@ -220,11 +174,65 @@
                                 </table>
                             </div>
                         )}
+
+                        {/* SECCIÓN PEDIDOS */}
+                        {seccion === 'pedidos' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {data.pedidos.map(p => (
+                                    <div key={p.id} className="glass p-5 rounded-3xl flex items-center gap-4 border-l-4 border-orange-600">
+                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 flex-shrink-0 border border-white/5">
+                                            <img src={p.foto_url} className="w-full h-full object-contain" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-black text-[10px] text-orange-500 uppercase truncate">{p.herramienta_nombre}</p>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase truncate">{p.usuario_nombre}</p>
+                                            <p className="font-tech text-xs mt-1">{p.cantidad_pedida} PZ</p>
+                                        </div>
+                                        <button onClick={async () => {
+                                            const h = data.herramientas.find(i => i.id === p.herramienta_id);
+                                            if(!h || h.cantidad < p.cantidad_pedida) return alert("NO HAY STOCK SUFICIENTE");
+                                            setCargando(true);
+                                            await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
+                                            await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
+                                            await supabase.from('pedidos').delete().eq('id', p.id);
+                                            setCargando(false);
+                                        }} className="bg-green-600 px-4 py-2 rounded-xl font-black text-[8px] uppercase">Listo</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </main>
 
-                    {/* MODALES IGUALES PERO CON NOMBRE FIJO */}
+                    {/* MODAL DE EDICIÓN/CREACIÓN (PARA ADMIN) */}
+                    {form && (
+                        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
+                            <div className="glass p-8 rounded-[2.5rem] w-full max-w-sm">
+                                <h2 className="font-black text-orange-500 mb-6 uppercase text-center">{form.id ? 'Editar Material' : 'Nuevo Material'}</h2>
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="NOMBRE" className="w-full bg-slate-900 p-4 rounded-xl font-bold uppercase text-xs" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
+                                    <input type="number" placeholder="CANTIDAD" className="w-full bg-slate-900 p-4 rounded-xl font-bold text-xs" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
+                                    <input type="text" placeholder="LUGAR (RACK, PISO, ETC)" className="w-full bg-slate-900 p-4 rounded-xl font-bold uppercase text-xs" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                    <input type="text" placeholder="URL DE FOTO" className="w-full bg-slate-900 p-4 rounded-xl font-bold text-[10px]" value={form.foto_url} onChange={e => setForm({...form, foto_url: e.target.value})} />
+                                </div>
+                                <div className="mt-8 flex gap-2">
+                                    <button onClick={() => setForm(null)} className="flex-1 py-4 font-black uppercase text-[10px] bg-slate-800 rounded-xl">Cancelar</button>
+                                    <button onClick={async () => {
+                                        setCargando(true);
+                                        if(form.id) {
+                                            await supabase.from('herramientas').update({ nombre: form.nombre, cantidad: form.cantidad, lugar: form.lugar, foto_url: form.foto_url }).eq('id', form.id);
+                                        } else {
+                                            await supabase.from('herramientas').insert([form]);
+                                        }
+                                        setForm(null); setCargando(false);
+                                    }} className="flex-[2] py-4 font-black uppercase text-[10px] bg-orange-600 rounded-xl">Guardar Cambios</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MODAL SOLICITUD (USUARIO) */}
                     {modalPedido && (
-                        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex items-center justify-center p-6">
+                        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-6">
                             <div className="glass p-8 rounded-[3rem] w-full max-w-xs text-center border-orange-500/30">
                                 <div className="img-container mx-auto mb-4 h-32"><SmartImage src={modalPedido.foto_url} /></div>
                                 <h2 className="font-black text-orange-500 mb-6 uppercase text-sm">{modalPedido.nombre}</h2>
@@ -240,8 +248,8 @@
                                     setCargando(true);
                                     await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: pedidoForm.usuario, tarea: pedidoForm.tarea, cantidad_pedida: pedidoForm.cantidad, foto_url: modalPedido.foto_url }]);
                                     setModalPedido(null); setCargando(false);
-                                }} className="bg-orange-600 w-full py-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-orange-600/20 transition-all active:scale-95">Confirmar Pedido</button>
-                                <button onClick={() => setModalPedido(null)} className="mt-6 text-[10px] text-slate-500 font-bold uppercase tracking-widest">Regresar</button>
+                                }} className="bg-orange-600 w-full py-4 rounded-2xl font-black uppercase text-xs">Confirmar Pedido</button>
+                                <button onClick={() => setModalPedido(null)} className="mt-6 text-[10px] text-slate-500 font-bold uppercase">Regresar</button>
                             </div>
                         </div>
                     )}
