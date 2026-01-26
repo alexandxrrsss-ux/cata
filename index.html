@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Pro v17 - Full Names & Realtime</title>
+    <title>StockMaster Pro v21 - Full Version</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -15,24 +15,42 @@
         body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; overflow-x: hidden; }
         .font-tech { font-family: 'Orbitron', sans-serif; }
         .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .neo-orange { border: 1px solid #f97316; box-shadow: 0 0 20px rgba(249, 115, 22, 0.2); }
         .tab-active { background: #f97316 !important; color: white !important; }
         
-        /* Ajuste para nombres largos */
-        .nombre-completo { 
-            display: block; 
-            overflow: visible; 
-            white-space: normal; 
-            word-break: break-word; 
-            line-height: 1.2;
-            min-height: 2.4em; /* Espacio para al menos 2 líneas */
+        /* CONTENEDOR DE IMAGEN: Centra el cargador y no tapa el texto */
+        .img-wrapper { 
+            position: relative; 
+            background: #0f172a; 
+            width: 100%; 
+            height: 130px; 
+            border-radius: 1.5rem; 
+            overflow: hidden; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .img-wrapper { position: relative; background: #0f172a; width: 100%; height: 120px; border-radius: 1rem; overflow: hidden; }
-        .img-fast { opacity: 0; transition: opacity 0.4s ease; }
-        .img-fast.loaded { opacity: 1; }
-        
-        .loader-mini { border: 2px solid rgba(249, 115, 22, 0.1); border-top: 2px solid #f97316; border-radius: 50%; width: 20px; height: 20px; animation: spin 0.8s linear infinite; }
+        .loader-mini { 
+            position: absolute;
+            border: 3px solid rgba(249, 115, 22, 0.1); 
+            border-top: 3px solid #f97316; 
+            border-radius: 50%; 
+            width: 25px; 
+            height: 25px; 
+            animation: spin 0.8s linear infinite; 
+        }
+
+        .nombre-material { 
+            font-weight: 900; 
+            font-size: 12px;
+            line-height: 1.2;
+            color: #ffffff;
+            text-transform: uppercase;
+            min-height: 32px;
+            display: block;
+            margin-top: 10px;
+        }
+
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -40,36 +58,37 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useCallback } = React;
+        const { useState, useEffect, useCallback, useMemo } = React;
 
         const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const ADMIN_PASSWORD = "123";
 
-        const SmartImage = ({ src, alt, agotado }) => {
+        // Componente de Imagen Inteligente
+        const SmartImage = ({ src, agotado }) => {
             const [loaded, setLoaded] = useState(false);
             return (
-                <div className="img-wrapper flex items-center justify-center">
+                <div className="img-wrapper">
                     {!loaded && <div className="loader-mini"></div>}
-                    <img src={src} alt={alt} decoding="async" onLoad={() => setLoaded(true)}
-                        className={`w-full h-full object-contain img-fast ${loaded ? 'loaded' : ''} ${agotado ? 'grayscale opacity-30' : ''}`} />
+                    <img 
+                        src={src} 
+                        onLoad={() => setLoaded(true)}
+                        className={`w-full h-full object-contain transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'} ${agotado ? 'grayscale brightness-50' : ''}`} 
+                    />
                 </div>
             );
         };
 
         function App() {
-            const [herramientas, setHerramientas] = useState([]);
-            const [pedidos, setPedidos] = useState([]);
-            const [historial, setHistorial] = useState([]);
+            const [data, setData] = useState({ herramientas: [], pedidos: [], historial: [] });
+            const [seccion, setSeccion] = useState('stock');
             const [busqueda, setBusqueda] = useState('');
             const [isAdmin, setIsAdmin] = useState(false);
-            const [seccion, setSeccion] = useState('stock'); 
             const [mostrarLogin, setMostrarLogin] = useState(false);
-            const [modalPedido, setModalPedido] = useState(null);
             const [cargando, setCargando] = useState(false);
-            const [msgCarga, setMsgCarga] = useState("");
-            const [form, setForm] = useState({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ' });
+            const [modalPedido, setModalPedido] = useState(null);
+            const [form, setForm] = useState(null);
             const [pedidoForm, setPedidoForm] = useState({ usuario: '', tarea: '', cantidad: 1 });
 
             const fetchData = useCallback(async () => {
@@ -78,163 +97,121 @@
                     supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
                     supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(40)
                 ]);
-                setHerramientas(h.data || []);
-                setPedidos(p.data || []);
-                setHistorial(hi.data || []);
+                setData({ herramientas: h.data || [], pedidos: p.data || [], historial: hi.data || [] });
             }, []);
 
-            // REALTIME REFORZADO
             useEffect(() => {
                 fetchData();
-                const channel = supabase.channel('schema-db-changes')
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'herramientas' }, () => fetchData())
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => fetchData())
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'historial' }, () => fetchData())
-                    .subscribe((status) => {
-                        console.log("Estado de conexión Realtime:", status);
-                    });
-
-                return () => { supabase.removeChannel(channel); };
+                const sub = supabase.channel('realtime-all').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
+                return () => supabase.removeChannel(sub);
             }, [fetchData]);
 
             const filtrarStock = useMemo(() => {
-                return herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase()));
-            }, [herramientas, busqueda]);
+                return data.herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase()));
+            }, [data.herramientas, busqueda]);
 
-            const handleGuardar = async () => {
-                if (!form.nombre || form.cantidad === '') return alert("Nombre y Cantidad obligatorios");
-                setCargando(true); setMsgCarga("SINCRONIZANDO...");
-                try {
-                    let urlFinal = form.foto_url || 'https://via.placeholder.com/400?text=Sin+Imagen';
-                    if (form.foto) {
-                        const compressed = await imageCompression(form.foto, { maxSizeMB: 0.1, maxWidthOrHeight: 800 });
-                        const fileName = `${Date.now()}.jpg`;
-                        await supabase.storage.from('herramientas').upload(fileName, compressed);
-                        urlFinal = supabase.storage.from('herramientas').getPublicUrl(fileName).data.publicUrl;
-                    }
-                    const payload = { nombre: form.nombre, cantidad: parseFloat(form.cantidad), lugar: form.lugar, unidad: form.unidad, foto_url: urlFinal };
-                    if (form.id) await supabase.from('herramientas').update(payload).eq('id', form.id);
-                    else await supabase.from('herramientas').insert([payload]);
-                    setForm({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ' });
-                } catch (e) { alert("Error al guardar"); }
-                finally { setCargando(false); }
-            };
-
-            const eliminar = async (id) => {
-                if(confirm("¿Eliminar material permanentemente?")) {
-                    setCargando(true);
-                    await supabase.from('herramientas').delete().eq('id', id);
-                    setForm({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ' });
-                    setCargando(false);
+            const handleGuardar = async (e) => {
+                e.preventDefault();
+                setCargando(true);
+                let url = form.foto_url;
+                if (form.nuevaFoto) {
+                    const comp = await imageCompression(form.nuevaFoto, { maxSizeMB: 0.1, maxWidthOrHeight: 800 });
+                    const name = `${Date.now()}.jpg`;
+                    await supabase.storage.from('herramientas').upload(name, comp);
+                    url = supabase.storage.from('herramientas').getPublicUrl(name).data.publicUrl;
                 }
+                const body = { nombre: form.nombre, cantidad: parseFloat(form.cantidad), lugar: form.lugar, unidad: form.unidad, foto_url: url };
+                if (form.id) await supabase.from('herramientas').update(body).eq('id', form.id);
+                else await supabase.from('herramientas').insert([body]);
+                setForm(null); setCargando(false);
             };
 
             return (
-                <div className="min-h-screen p-3 md:p-8">
-                    {cargando && (
-                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md">
-                            <div className="loader-mini w-8 h-8 border-t-orange-500 mb-2"></div>
-                            <p className="text-[10px] text-orange-500 font-tech">{msgCarga}</p>
-                        </div>
-                    )}
-
-                    <header className="max-w-7xl mx-auto mb-6 flex flex-col items-center">
-                        <h2 className="text-xl font-black font-tech mb-4 tracking-tighter">STOCK<span className="text-orange-500">MASTER</span></h2>
-                        <div className="flex gap-1.5 bg-slate-900/80 p-1 rounded-xl glass border border-white/5">
-                            <button onClick={() => setSeccion('stock')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
-                            {isAdmin && (
-                                <>
-                                    <button onClick={() => setSeccion('pedidos')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos</button>
-                                    <button onClick={() => setSeccion('historial')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
-                                </>
-                            )}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-4 py-2 rounded-lg text-[9px] font-black bg-white/5 uppercase">{isAdmin ? 'Salir' : 'Admin'}</button>
+                <div className="min-h-screen pb-24">
+                    {/* Header Nav */}
+                    <header className="p-4 sticky top-0 z-40 glass mb-6">
+                        <div className="max-w-5xl mx-auto flex flex-col items-center">
+                            <h1 className="font-tech font-black text-lg mb-4 tracking-widest">STOCK<span className="text-orange-500">PRO</span></h1>
+                            <div className="flex gap-1 bg-white/5 p-1 rounded-xl">
+                                <button onClick={() => setSeccion('stock')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
+                                {isAdmin && (
+                                    <>
+                                        <button onClick={() => setSeccion('pedidos')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({data.pedidos.length})</button>
+                                        <button onClick={() => setSeccion('historial')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
+                                    </>
+                                )}
+                                <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-4 py-2 rounded-lg text-[9px] font-black uppercase bg-white/5">
+                                    {isAdmin ? 'Salir' : 'Admin'}
+                                </button>
+                            </div>
                         </div>
                     </header>
 
-                    <main className="max-w-7xl mx-auto">
+                    <main className="px-4 max-w-5xl mx-auto">
                         {seccion === 'stock' && (
-                            <div>
-                                <div className="flex gap-2 mb-6">
-                                    <input type="text" placeholder="Buscar..." className="flex-1 bg-slate-900/50 p-3 rounded-xl border border-white/10 outline-none text-sm" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ' })} className="bg-orange-600 px-5 rounded-xl font-black">+</button>}
+                            <>
+                                <div className="flex gap-2 mb-8">
+                                    <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 bg-slate-900 border border-white/10 p-4 rounded-2xl outline-none focus:border-orange-500 text-sm" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, unidad: 'PZ', lugar: '' })} className="bg-orange-600 px-6 rounded-2xl font-black text-xl">+</button>}
                                 </div>
 
-                                {isAdmin && (form.nombre !== undefined || form.id) && (
-                                    <div className="glass p-5 rounded-3xl mb-8 border border-orange-500/20">
-                                        <div className="grid grid-cols-1 gap-3">
-                                            <input type="text" placeholder="Nombre completo" className="bg-black/20 p-3 rounded-xl border border-white/5" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <input type="number" placeholder="Cant." className="bg-black/20 p-3 rounded-xl border border-white/5" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} />
-                                                <input type="text" placeholder="Ubicación" className="bg-black/20 p-3 rounded-xl border border-white/5" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
-                                            </div>
-                                            <input type="file" className="text-[10px]" onChange={e => setForm({...form, foto: e.target.files[0]})} />
-                                        </div>
-                                        <div className="mt-4 flex gap-2">
-                                            <button onClick={handleGuardar} className="bg-orange-600 flex-1 py-3 rounded-xl font-black text-[10px] uppercase">Guardar</button>
-                                            {form.id && <button onClick={() => eliminar(form.id)} className="bg-red-600/20 text-red-500 px-4 py-3 rounded-xl font-black text-[10px] uppercase border border-red-500/30">Borrar</button>}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     {filtrarStock.map(h => (
-                                        <div key={h.id} className="glass rounded-[2rem] p-3 flex flex-col group hover:neo-orange transition-all border border-white/5">
-                                            <SmartImage src={h.foto_url} alt={h.nombre} agotado={h.cantidad <= 0} />
-                                            <div className="mt-3 flex flex-col flex-grow">
-                                                <h3 className="nombre-completo font-bold text-[11px] uppercase text-slate-200">{h.nombre}</h3>
-                                                <div className="flex justify-between items-end mt-2">
-                                                    <span className="text-[8px] text-slate-500 uppercase font-bold truncate max-w-[50px]">{h.lugar || 'S/U'}</span>
-                                                    <span className="text-orange-500 font-tech text-xs">{h.cantidad}</span>
-                                                </div>
-                                                <button onClick={() => isAdmin ? (setForm(h), window.scrollTo(0,0)) : setModalPedido(h)} disabled={h.cantidad <= 0 && !isAdmin}
-                                                    className="mt-3 w-full py-2 rounded-xl text-[9px] font-black uppercase bg-slate-800 active:bg-orange-600 disabled:opacity-20 transition-colors">
-                                                    {isAdmin ? 'Editar' : 'Pedir'}
-                                                </button>
+                                        <div key={h.id} className="glass rounded-[2.5rem] p-3 flex flex-col border-white/5 shadow-2xl transition-transform active:scale-95">
+                                            <SmartImage src={h.foto_url} agotado={h.cantidad <= 0} />
+                                            <h3 className="nombre-material">{h.nombre}</h3>
+                                            <div className="flex justify-between items-center mt-2 mb-4">
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase">{h.lugar || 'BODEGA'}</span>
+                                                <span className="text-orange-500 font-tech text-xs">{h.cantidad}</span>
                                             </div>
+                                            <button onClick={() => isAdmin ? setForm(h) : setModalPedido(h)} disabled={h.cantidad <= 0 && !isAdmin}
+                                                className={`w-full py-3 rounded-xl font-black text-[9px] uppercase ${isAdmin ? 'bg-slate-700' : 'bg-orange-600'} disabled:opacity-20`}>
+                                                {isAdmin ? 'Editar' : 'Pedir'}
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {seccion === 'pedidos' && (
-                            <div className="grid grid-cols-1 gap-3">
-                                {pedidos.map(p => (
-                                    <div key={p.id} className="glass p-4 rounded-3xl flex items-center gap-4 border-l-4 border-l-orange-600">
-                                        <div className="w-14 h-14"><SmartImage src={p.foto_url} /></div>
-                                        <div className="flex-1">
-                                            <p className="font-bold text-[10px] uppercase text-orange-500">{p.herramienta_nombre}</p>
-                                            <p className="text-[9px] text-slate-400 font-bold">{p.usuario_nombre} • {p.tarea}</p>
+                            <div className="space-y-3">
+                                {data.pedidos.map(p => (
+                                    <div key={p.id} className="glass p-4 rounded-3xl flex items-center gap-4 border-l-4 border-orange-600">
+                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 flex-shrink-0">
+                                            <img src={p.foto_url} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-black text-[10px] text-orange-500 uppercase truncate">{p.herramienta_nombre}</p>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase">{p.usuario_nombre} • {p.tarea}</p>
                                             <p className="font-tech text-sm mt-1">{p.cantidad_pedida} PZ</p>
                                         </div>
                                         <button onClick={async () => {
-                                            const h = herramientas.find(item => item.id === p.herramienta_id);
-                                            if(!h || h.cantidad < p.cantidad_pedida) return alert("NO HAY STOCK");
+                                            const h = data.herramientas.find(i => i.id === p.herramienta_id);
+                                            if(!h || h.cantidad < p.cantidad_pedida) return alert("STOCK INSUFICIENTE");
                                             setCargando(true);
                                             await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
                                             await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
                                             await supabase.from('pedidos').delete().eq('id', p.id);
                                             setCargando(false);
-                                        }} className="bg-green-600 px-4 py-2 rounded-xl font-black text-[9px] uppercase">Listo</button>
+                                        }} className="bg-green-600 px-5 py-3 rounded-xl font-black text-[9px] uppercase">Aprobar</button>
                                     </div>
                                 ))}
                             </div>
                         )}
 
                         {seccion === 'historial' && (
-                            <div className="glass rounded-3xl overflow-hidden overflow-x-auto">
-                                <table className="w-full text-left text-[9px]">
-                                    <thead className="bg-slate-900/80 text-slate-500 uppercase">
-                                        <tr><th className="p-3">Foto</th><th className="p-3">Material</th><th className="p-3">Usuario</th><th className="p-3">Cant.</th></tr>
+                            <div className="glass rounded-[2rem] overflow-hidden">
+                                <table className="w-full text-[9px] uppercase">
+                                    <thead className="bg-slate-900 text-slate-500 font-black">
+                                        <tr><th className="p-4 text-left">Material</th><th className="p-4 text-left">Usuario</th><th className="p-4 text-center">Cant</th></tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-800 uppercase">
-                                        {historial.map(hi => (
+                                    <tbody className="divide-y divide-white/5">
+                                        {data.historial.map(hi => (
                                             <tr key={hi.id} className="hover:bg-white/5">
-                                                <td className="p-2"><div className="w-8 h-8"><SmartImage src={hi.foto_url} /></div></td>
-                                                <td className="p-3 font-bold">{hi.herramienta_nombre}</td>
-                                                <td className="p-3 text-slate-400">{hi.usuario}</td>
-                                                <td className="p-3 font-tech text-orange-500">{hi.cantidad}</td>
+                                                <td className="p-4 font-bold">{hi.herramienta_nombre}</td>
+                                                <td className="p-4 text-slate-400">{hi.usuario}</td>
+                                                <td className="p-4 text-center font-tech text-orange-500">{hi.cantidad}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -243,38 +220,70 @@
                         )}
                     </main>
 
-                    {/* MODAL PEDIDO */}
+                    {/* MODAL ADMIN FORM */}
+                    {form && (
+                        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl p-4 flex items-center justify-center">
+                            <form onSubmit={handleGuardar} className="glass p-6 rounded-[2.5rem] w-full max-w-sm space-y-4">
+                                <h2 className="font-tech font-black text-center text-orange-500">EDITOR</h2>
+                                <input type="text" placeholder="Nombre del material" required className="w-full bg-slate-900 p-4 rounded-2xl" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input type="number" placeholder="Cantidad" required className="w-full bg-slate-900 p-4 rounded-2xl" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} />
+                                    <input type="text" placeholder="Ubicación" className="w-full bg-slate-900 p-4 rounded-2xl" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                </div>
+                                <input type="file" className="text-[10px]" onChange={e => setForm({...form, nuevaFoto: e.target.files[0]})} />
+                                <div className="flex gap-2 pt-4">
+                                    <button type="submit" className="bg-orange-600 flex-1 py-4 rounded-2xl font-black uppercase text-xs">Guardar</button>
+                                    {form.id && <button type="button" onClick={async () => {
+                                        if(confirm("¿Borrar permanentemente?")) await supabase.from('herramientas').delete().eq('id', form.id);
+                                        setForm(null);
+                                    }} className="bg-red-600 px-5 rounded-2xl">🗑</button>}
+                                    <button type="button" onClick={() => setForm(null)} className="bg-slate-700 px-5 rounded-2xl text-xs">X</button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* MODAL PEDIDO USUARIO */}
                     {modalPedido && (
-                        <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-6 z-50">
-                            <div className="glass p-6 rounded-[2.5rem] w-full max-w-xs text-center border border-orange-500/20">
-                                <div className="w-20 h-20 mx-auto mb-3"><SmartImage src={modalPedido.foto_url} /></div>
-                                <h2 className="font-bold uppercase mb-4 text-[11px] text-slate-300">{modalPedido.nombre}</h2>
-                                <input type="text" placeholder="TU NOMBRE" className="w-full bg-slate-900 p-3 rounded-xl mb-2 border border-white/5 text-center uppercase font-bold text-sm" value={pedidoForm.usuario} onChange={e => setPedidoForm({...pedidoForm, usuario: e.target.value})} />
-                                <input type="text" placeholder="ACTIVIDAD" className="w-full bg-slate-900 p-3 rounded-xl mb-4 border border-white/5 text-center uppercase font-bold text-sm" value={pedidoForm.tarea} onChange={e => setPedidoForm({...pedidoForm, tarea: e.target.value})} />
-                                <div className="flex items-center justify-between bg-slate-800/50 p-2 rounded-xl mb-6 font-tech">
-                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.max(1, pedidoForm.cantidad - 1)})} className="w-10 h-10 text-orange-500 text-xl">-</button>
-                                    <span>{pedidoForm.cantidad}</span>
-                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.min(modalPedido.cantidad, pedidoForm.cantidad + 1)})} className="w-10 h-10 text-orange-500 text-xl">+</button>
+                        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex items-center justify-center p-6">
+                            <div className="glass p-8 rounded-[3rem] w-full max-w-xs text-center border-orange-500/30">
+                                <div className="w-24 h-24 mx-auto mb-4"><SmartImage src={modalPedido.foto_url} /></div>
+                                <h2 className="font-black text-orange-500 mb-6 uppercase text-xs">{modalPedido.nombre}</h2>
+                                <input type="text" placeholder="TU NOMBRE" className="w-full bg-slate-900 p-4 rounded-2xl mb-2 text-center font-bold uppercase" value={pedidoForm.usuario} onChange={e => setPedidoForm({...pedidoForm, usuario: e.target.value})} />
+                                <input type="text" placeholder="ACTIVIDAD" className="w-full bg-slate-900 p-4 rounded-2xl mb-6 text-center font-bold uppercase" value={pedidoForm.tarea} onChange={e => setPedidoForm({...pedidoForm, tarea: e.target.value})} />
+                                <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl mb-6">
+                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.max(1, pedidoForm.cantidad-1)})} className="w-12 h-12 text-2xl text-orange-500">-</button>
+                                    <span className="font-tech text-xl">{pedidoForm.cantidad}</span>
+                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.min(modalPedido.cantidad, pedidoForm.cantidad+1)})} className="w-12 h-12 text-2xl text-orange-500">+</button>
                                 </div>
                                 <button onClick={async () => {
-                                    if(!pedidoForm.usuario || !pedidoForm.tarea) return alert("Llena todos los campos");
+                                    if(!pedidoForm.usuario || !pedidoForm.tarea) return alert("FALTAN DATOS");
                                     setCargando(true);
                                     await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: pedidoForm.usuario, tarea: pedidoForm.tarea, cantidad_pedida: pedidoForm.cantidad, foto_url: modalPedido.foto_url }]);
                                     setModalPedido(null); setCargando(false);
-                                }} className="w-full bg-orange-600 py-3 rounded-xl font-black uppercase text-[10px]">Confirmar Pedido</button>
-                                <button onClick={() => setModalPedido(null)} className="mt-4 text-[9px] text-slate-500 uppercase font-bold">Cancelar</button>
+                                    alert("SOLICITUD ENVIADA");
+                                }} className="bg-orange-600 w-full py-4 rounded-2xl font-black uppercase text-xs">Confirmar</button>
+                                <button onClick={() => setModalPedido(null)} className="mt-6 text-[10px] text-slate-500 font-bold uppercase">Cancelar</button>
                             </div>
                         </div>
                     )}
 
                     {/* LOGIN ADMIN */}
                     {mostrarLogin && (
-                        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-6">
-                            <div className="glass p-8 rounded-[2.5rem] w-full max-w-[280px] text-center border border-orange-500/10">
+                        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-6">
+                            <div className="glass p-8 rounded-[2.5rem] w-full max-w-[280px] text-center">
+                                <p className="text-[10px] font-black mb-4 uppercase text-slate-500">Acceso Restringido</p>
                                 <input type="password" placeholder="CLAVE" className="w-full bg-slate-900 p-4 rounded-xl text-center text-2xl outline-none border border-orange-500/50" autoFocus 
                                     onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false))} />
-                                <button onClick={() => setMostrarLogin(false)} className="mt-6 text-[9px] text-slate-600 uppercase">Cerrar</button>
+                                <button onClick={() => setMostrarLogin(false)} className="mt-6 text-[9px] text-slate-600 font-bold uppercase">Cerrar</button>
                             </div>
+                        </div>
+                    )}
+
+                    {/* OVERLAY CARGANDO */}
+                    {cargando && (
+                        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                            <div className="loader-mini w-10 h-10"></div>
                         </div>
                     )}
                 </div>
