@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Pro v15 - Industrial Live</title>
+    <title>StockMaster Pro v15 - Ultra Fast</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -17,12 +17,17 @@
         .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
         .neo-orange { border: 1px solid #f97316; box-shadow: 0 0 20px rgba(249, 115, 22, 0.2); }
         .tab-active { background: #f97316 !important; color: white !important; }
-        .agotado { filter: grayscale(1); opacity: 0.5; }
-        .img-fast { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-out; }
-        .img-fast.loaded { opacity: 1; transform: scale(1); }
+        
+        /* Contenedor de carga para fotos */
+        .img-wrapper { position: relative; background: radial-gradient(circle, #1e293b 0%, #020617 100%); width: 100%; height: 100%; overflow: hidden; }
+        .img-fast { opacity: 0; transition: opacity 0.3s ease-in; }
+        .img-fast.loaded { opacity: 1; }
+        
+        /* Spinner pequeño para cada tarjeta */
+        .loader-mini { border: 2px solid rgba(249, 115, 22, 0.1); border-top: 2px solid #f97316; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
+        
         @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .critico { animation: pulse-red 1s infinite; color: #fb923c; font-weight: 900; }
-        .spinner { border: 4px solid rgba(249, 115, 22, 0.1); border-top: 4px solid #f97316; border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -36,6 +41,23 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const ADMIN_PASSWORD = "123";
+
+        // Componente de imagen con carga inteligente
+        const SmartImage = ({ src, alt, agotado }) => {
+            const [isLoaded, setIsLoaded] = useState(false);
+            return (
+                <div className="img-wrapper flex items-center justify-center">
+                    {!isLoaded && <div className="absolute inset-0 flex items-center justify-center"><div className="loader-mini"></div></div>}
+                    <img 
+                        src={src} 
+                        alt={alt}
+                        decoding="async"
+                        onLoad={() => setIsLoaded(true)}
+                        className={`w-full h-full object-contain img-fast ${isLoaded ? 'loaded' : ''} ${agotado ? 'grayscale opacity-40' : ''}`}
+                    />
+                </div>
+            );
+        };
 
         function App() {
             const [herramientas, setHerramientas] = useState([]);
@@ -72,26 +94,6 @@
                 return herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase()));
             }, [herramientas, busqueda]);
 
-            const handleGuardarMaterial = async () => {
-                if (!form.nombre || form.cantidad === '') return alert("Faltan datos");
-                setMsgCarga("COMPRIMIENDO Y SUBIENDO..."); setCargando(true);
-                try {
-                    let urlFinal = form.foto_url || 'https://via.placeholder.com/400?text=Sin+Imagen';
-                    if (form.foto) {
-                        const options = { maxSizeMB: 0.2, maxWidthOrHeight: 800, useWebWorker: true };
-                        const comprimido = await imageCompression(form.foto, options);
-                        const fileName = `${Date.now()}.jpg`;
-                        await supabase.storage.from('herramientas').upload(fileName, comprimido);
-                        urlFinal = supabase.storage.from('herramientas').getPublicUrl(fileName).data.publicUrl;
-                    }
-                    const payload = { nombre: form.nombre, cantidad: parseFloat(form.cantidad), lugar: form.lugar, unidad: form.unidad, foto_url: urlFinal };
-                    if (form.id) await supabase.from('herramientas').update(payload).eq('id', form.id);
-                    else await supabase.from('herramientas').insert([payload]);
-                    setForm({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ' });
-                } catch (e) { alert("Error"); }
-                finally { setCargando(false); }
-            };
-
             const confirmarEntrega = async (p) => {
                 const h = herramientas.find(item => item.id === p.herramienta_id);
                 if(!h || h.cantidad < p.cantidad_pedida) return alert("STOCK INSUFICIENTE");
@@ -110,22 +112,42 @@
                 setCargando(false);
             };
 
+            const handleGuardarMaterial = async () => {
+                if (!form.nombre || form.cantidad === '') return alert("Faltan datos");
+                setMsgCarga("OPTIMIZANDO IMAGEN..."); setCargando(true);
+                try {
+                    let urlFinal = form.foto_url || 'https://via.placeholder.com/400?text=Sin+Imagen';
+                    if (form.foto) {
+                        const options = { maxSizeMB: 0.15, maxWidthOrHeight: 800, useWebWorker: true };
+                        const comprimido = await imageCompression(form.foto, options);
+                        const fileName = `${Date.now()}.jpg`;
+                        await supabase.storage.from('herramientas').upload(fileName, comprimido);
+                        urlFinal = supabase.storage.from('herramientas').getPublicUrl(fileName).data.publicUrl;
+                    }
+                    const payload = { nombre: form.nombre, cantidad: parseFloat(form.cantidad), lugar: form.lugar, unidad: form.unidad, foto_url: urlFinal };
+                    if (form.id) await supabase.from('herramientas').update(payload).eq('id', form.id);
+                    else await supabase.from('herramientas').insert([payload]);
+                    setForm({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ' });
+                } catch (e) { alert("Error al guardar"); }
+                finally { setCargando(false); }
+            };
+
             return (
                 <div className="min-h-screen p-4 md:p-8">
                     {cargando && (
-                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-                            <div className="spinner mb-4"></div>
-                            <p className="font-tech text-[10px] text-orange-500 tracking-widest">{msgCarga}</p>
+                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm">
+                            <div className="border-4 border-orange-500/20 border-t-orange-500 rounded-full w-12 h-12 animate-spin mb-4"></div>
+                            <p className="font-tech text-[10px] text-orange-500 tracking-widest uppercase">{msgCarga}</p>
                         </div>
                     )}
 
                     <header className="max-w-7xl mx-auto mb-8 flex flex-col items-center">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 bg-orange-600 rounded-xl flex items-center justify-center font-black">S</div>
-                            <h1 className="text-2xl font-black font-tech tracking-tighter italic">STOCK<span className="text-orange-500">PRO</span></h1>
+                            <h1 className="text-2xl font-black font-tech tracking-tighter">STOCK<span className="text-orange-500">MASTER</span></h1>
                         </div>
                         <div className="flex gap-2 bg-slate-900/50 p-1.5 rounded-2xl glass border border-white/5">
-                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
+                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'stock' ? 'tab-active' : ''}`}>Materiales</button>
                             {isAdmin && (
                                 <>
                                     <button onClick={() => setSeccion('pedidos')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({pedidos.length})</button>
@@ -140,11 +162,12 @@
                         {seccion === 'stock' && (
                             <div>
                                 <div className="flex gap-3 mb-8">
-                                    <input type="text" placeholder="Buscar material..." className="flex-1 bg-slate-900/50 p-4 rounded-2xl border border-white/5 outline-none" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    <input type="text" placeholder="Buscar material..." className="flex-1 bg-slate-900/50 p-4 rounded-2xl border border-white/5 outline-none focus:border-orange-500/50" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
                                     {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: '', lugar: '', unidad: 'PZ' })} className="bg-orange-600 px-6 rounded-2xl font-black shadow-lg">+</button>}
                                 </div>
+
                                 {isAdmin && (form.nombre !== undefined || form.id) && (
-                                    <div className="glass p-6 rounded-[2.5rem] mb-10 border-orange-500/20">
+                                    <div className="glass p-6 rounded-[2.5rem] mb-10 border border-orange-500/20">
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                             <input type="text" placeholder="Nombre" className="bg-black/20 p-4 rounded-xl border border-white/5" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
                                             <input type="number" placeholder="Stock" className="bg-black/20 p-4 rounded-xl border border-white/5" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} />
@@ -152,28 +175,28 @@
                                             <input type="file" className="text-[10px] self-center" onChange={e => setForm({...form, foto: e.target.files[0]})} />
                                         </div>
                                         <div className="mt-6 flex gap-2">
-                                            <button onClick={handleGuardarMaterial} className="bg-orange-600 px-8 py-3 rounded-xl font-black text-[10px] uppercase">Guardar</button>
-                                            {form.id && <button onClick={async () => { if(confirm("¿Borrar?")) await supabase.from('herramientas').delete().eq('id', form.id); setForm({}); }} className="bg-red-900/40 text-red-500 px-6 py-3 rounded-xl font-black text-[10px] uppercase">Borrar</button>}
+                                            <button onClick={handleGuardarMaterial} className="bg-orange-600 px-8 py-3 rounded-xl font-black text-[10px] uppercase">Guardar Material</button>
                                             <button onClick={() => setForm({})} className="bg-slate-800 px-6 py-3 rounded-xl font-black text-[10px] uppercase">Cerrar</button>
                                         </div>
                                     </div>
                                 )}
+
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                                     {filtrarHerramientas.map(h => (
-                                        <div key={h.id} className="glass rounded-[2rem] overflow-hidden flex flex-col group hover:neo-orange transition-all">
-                                            <div className="h-32 w-full relative bg-black/20">
-                                                <img src={h.foto_url} className={`w-full h-full object-contain img-fast loaded ${h.cantidad <= 0 ? 'agotado' : ''}`} />
-                                                {h.cantidad <= 0 && <div className="absolute inset-0 flex items-center justify-center"><span className="bg-red-600 text-white text-[8px] font-black px-2 py-1 rounded">AGOTADO</span></div>}
+                                        <div key={h.id} className="glass rounded-[2rem] overflow-hidden flex flex-col group hover:neo-orange transition-all h-full">
+                                            <div className="h-32 w-full relative">
+                                                <SmartImage src={h.foto_url} alt={h.nombre} agotado={h.cantidad <= 0} />
+                                                {h.cantidad <= 0 && <div className="absolute inset-0 flex items-center justify-center"><span className="bg-red-600 text-[8px] font-black px-2 py-1 rounded-full uppercase shadow-lg">Agotado</span></div>}
                                             </div>
                                             <div className="p-4 flex flex-col flex-grow">
-                                                <h3 className="font-bold text-[10px] uppercase truncate text-slate-300">{h.nombre}</h3>
-                                                <div className="flex justify-between items-end mt-2 font-tech">
-                                                    <span className="text-[8px] text-slate-600 uppercase italic">{h.lugar || 'Bodega'}</span>
-                                                    <span className={`${h.cantidad > 0 && h.cantidad <= 3 ? 'critico' : 'text-orange-500'} text-sm`}>{h.cantidad}</span>
+                                                <h3 className="font-bold text-[10px] uppercase truncate text-slate-300 mb-1">{h.nombre}</h3>
+                                                <div className="flex justify-between items-end mt-auto font-tech">
+                                                    <span className="text-[8px] text-slate-600 uppercase italic">{h.lugar || 'S/U'}</span>
+                                                    <span className={`${h.cantidad > 0 && h.cantidad <= 3 ? 'critico' : 'text-orange-500'} text-sm`}>{h.cantidad} <span className="text-[8px] text-slate-500">{h.unidad}</span></span>
                                                 </div>
                                                 <button onClick={() => isAdmin ? (setForm(h), window.scrollTo(0,0)) : setModalPedido(h)} disabled={h.cantidad <= 0 && !isAdmin}
-                                                    className={`mt-4 w-full py-2 rounded-xl text-[9px] font-black uppercase ${isAdmin ? 'bg-slate-800' : 'bg-orange-600'} disabled:opacity-20`}>
-                                                    {isAdmin ? 'Editar' : 'Pedir'}
+                                                    className={`mt-4 w-full py-2.5 rounded-xl text-[9px] font-black uppercase transition-all ${isAdmin ? 'bg-slate-800 hover:bg-orange-600' : 'bg-orange-600 active:scale-95'} disabled:opacity-20`}>
+                                                    {isAdmin ? 'Editar' : 'Solicitar'}
                                                 </button>
                                             </div>
                                         </div>
@@ -186,13 +209,13 @@
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {pedidos.map(p => (
                                     <div key={p.id} className="glass p-4 rounded-[2rem] flex items-center gap-4 border-l-4 border-l-orange-600">
-                                        <img src={p.foto_url} className="w-16 h-16 rounded-xl object-contain bg-black/40" />
+                                        <div className="w-16 h-16"><SmartImage src={p.foto_url} alt={p.herramienta_nombre} /></div>
                                         <div className="flex-1 uppercase">
                                             <p className="font-tech text-[10px] text-orange-500">{p.herramienta_nombre}</p>
                                             <p className="font-black text-lg">{p.cantidad_pedida} PZ</p>
                                             <p className="text-[9px] text-slate-500 font-bold">{p.usuario_nombre} • {p.tarea}</p>
                                         </div>
-                                        <button onClick={() => confirmarEntrega(p)} className="bg-green-600 px-4 py-2 rounded-xl font-black text-[9px] uppercase">Confirmar</button>
+                                        <button onClick={() => confirmarEntrega(p)} className="bg-green-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase">Entregar</button>
                                     </div>
                                 ))}
                             </div>
@@ -201,18 +224,18 @@
                         {seccion === 'historial' && (
                             <div className="glass rounded-[2rem] overflow-hidden overflow-x-auto">
                                 <table className="w-full text-left text-[10px]">
-                                    <thead className="bg-slate-900 text-slate-500 font-tech uppercase">
+                                    <thead className="bg-slate-900/80 text-slate-500 font-tech uppercase">
                                         <tr><th className="p-4">Foto</th><th className="p-4">Fecha</th><th className="p-4">Material</th><th className="p-4">Usuario</th><th className="p-4">Actividad</th><th className="p-4">Cant.</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800">
                                         {historial.map(hi => (
-                                            <tr key={hi.id} className="hover:bg-white/5 transition-colors">
-                                                <td className="p-2"><img src={hi.foto_url} className="w-10 h-10 object-contain rounded-lg" /></td>
+                                            <tr key={hi.id} className="hover:bg-white/5">
+                                                <td className="p-2"><div className="w-10 h-10"><SmartImage src={hi.foto_url} /></div></td>
                                                 <td className="p-4 text-slate-500">{new Date(hi.fecha).toLocaleDateString()}</td>
                                                 <td className="p-4 font-black uppercase text-orange-500">{hi.herramienta_nombre}</td>
                                                 <td className="p-4 font-bold uppercase">{hi.usuario}</td>
                                                 <td className="p-4 uppercase text-slate-400">{hi.tarea}</td>
-                                                <td className="p-4 font-tech">{hi.cantidad}</td>
+                                                <td className="p-4 font-tech text-orange-400">{hi.cantidad}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -221,26 +244,26 @@
                         )}
                     </main>
 
-                    {/* MODAL PEDIDO */}
+                    {/* MODAL SOLICITUD */}
                     {modalPedido && (
                         <div className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-6 z-50">
                             <div className="glass p-8 rounded-[3rem] border border-orange-500/30 w-full max-w-xs text-center shadow-2xl">
-                                <img src={modalPedido.foto_url} className="w-20 h-20 mx-auto mb-4 object-contain" />
+                                <div className="w-24 h-24 mx-auto mb-4"><SmartImage src={modalPedido.foto_url} /></div>
                                 <h2 className="font-black uppercase mb-6 text-sm">{modalPedido.nombre}</h2>
                                 <input type="text" placeholder="NOMBRE" className="w-full bg-slate-900 p-4 rounded-xl mb-3 outline-none border border-white/5 focus:border-orange-500 text-center uppercase font-bold" value={pedidoForm.usuario} onChange={e => setPedidoForm({...pedidoForm, usuario: e.target.value})} />
                                 <input type="text" placeholder="PARA QUÉ ACTIVIDAD" className="w-full bg-slate-900 p-4 rounded-xl mb-6 outline-none border border-white/5 focus:border-orange-500 text-center uppercase font-bold" value={pedidoForm.tarea} onChange={e => setPedidoForm({...pedidoForm, tarea: e.target.value})} />
                                 <div className="flex items-center justify-between bg-slate-900 p-2 rounded-xl mb-6 font-tech">
-                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.max(1, pedidoForm.cantidad - 1)})} className="w-10 h-10 text-orange-500 text-2xl">-</button>
-                                    <span>{pedidoForm.cantidad}</span>
-                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.min(modalPedido.cantidad, pedidoForm.cantidad + 1)})} className="w-10 h-10 text-orange-500 text-2xl">+</button>
+                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.max(1, pedidoForm.cantidad - 1)})} className="w-12 h-12 text-orange-500 text-2xl">-</button>
+                                    <span className="text-xl">{pedidoForm.cantidad}</span>
+                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.min(modalPedido.cantidad, pedidoForm.cantidad + 1)})} className="w-12 h-12 text-orange-500 text-2xl">+</button>
                                 </div>
                                 <button onClick={async () => {
-                                    if(!pedidoForm.usuario || !pedidoForm.tarea) return alert("Completa todos los campos");
+                                    if(!pedidoForm.usuario || !pedidoForm.tarea) return alert("Completa los campos");
                                     setCargando(true);
                                     await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: pedidoForm.usuario, tarea: pedidoForm.tarea, cantidad_pedida: pedidoForm.cantidad, foto_url: modalPedido.foto_url }]);
                                     setModalPedido(null); setCargando(false);
-                                }} className="w-full bg-orange-600 py-4 rounded-2xl font-black uppercase text-xs">Confirmar Envío</button>
-                                <button onClick={() => setModalPedido(null)} className="mt-4 text-[9px] text-slate-500 font-bold uppercase">Cancelar</button>
+                                }} className="w-full bg-orange-600 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg">Confirmar Solicitud</button>
+                                <button onClick={() => setModalPedido(null)} className="mt-4 text-[9px] text-slate-500 font-bold uppercase">Cerrar</button>
                             </div>
                         </div>
                     )}
@@ -248,10 +271,11 @@
                     {/* LOGIN */}
                     {mostrarLogin && (
                         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50">
-                            <div className="glass p-8 rounded-[2.5rem] w-full max-w-[280px] text-center">
-                                <input type="password" placeholder="••••" className="w-full bg-slate-900 p-4 rounded-2xl text-center text-2xl outline-none border border-orange-500/50" autoFocus 
+                            <div className="glass p-10 rounded-[3rem] w-full max-w-[280px] text-center border border-orange-500/20 shadow-2xl">
+                                <p className="font-tech text-[9px] mb-6 text-orange-500 tracking-widest uppercase">Admin Access</p>
+                                <input type="password" placeholder="••••" className="w-full bg-slate-900 p-4 rounded-2xl text-center text-3xl outline-none border border-orange-500/50" autoFocus 
                                     onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false))} />
-                                <button onClick={() => setMostrarLogin(false)} className="mt-6 text-[9px] text-slate-600 uppercase">Volver</button>
+                                <button onClick={() => setMostrarLogin(false)} className="mt-6 text-[9px] text-slate-600 uppercase font-black">Volver</button>
                             </div>
                         </div>
                     )}
