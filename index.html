@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockMaster Pro v26 - Full Control</title>
+    <title>StockMaster Pro v27</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -13,8 +13,8 @@
     <style>
         body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .font-tech { font-family: 'Orbitron', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-        .tab-active { background: #f97316 !important; color: white !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.3); }
+        .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        .tab-active { background: #f97316 !important; color: white !important; }
         
         .loader-spin {
             border: 3px solid rgba(249, 115, 22, 0.1); border-top: 3px solid #f97316;
@@ -22,13 +22,12 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .img-container { 
-            position: relative; background: #0f172a; width: 100%; height: 130px; 
-            border-radius: 1rem; overflow: hidden; display: flex; align-items: center; justify-content: center;
+        .btn-close {
+            position: absolute; top: -15px; right: -15px; width: 35px; height: 35px;
+            background: #ef4444; color: white; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-weight: bold; font-size: 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 100; cursor: pointer;
         }
-
-        .grid-master { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        @media (min-width: 1024px) { .grid-master { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
     </style>
 </head>
 <body>
@@ -36,22 +35,18 @@
 
     <script type="text/babel">
         const { useState, useEffect, useCallback } = React;
-
         const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const ADMIN_PASSWORD = "123";
 
-        const ImageWithLoader = ({ src, agotado, className = "" }) => {
+        const ImageWithLoader = ({ src, className = "" }) => {
             const [loading, setLoading] = useState(true);
             return (
-                <div className={`img-container ${className}`}>
+                <div className={`relative bg-black/40 rounded-2xl overflow-hidden flex items-center justify-center ${className}`}>
                     {loading && <div className="absolute inset-0 flex items-center justify-center z-10"><div className="loader-spin"></div></div>}
-                    <img 
-                        src={src || 'https://via.placeholder.com/150'} 
-                        onLoad={() => setLoading(false)}
-                        className={`w-full h-full object-contain p-2 transition-all duration-500 ${loading ? 'opacity-0' : 'opacity-100'} ${agotado ? 'grayscale brightness-50' : ''}`}
-                    />
+                    <img src={src || 'https://via.placeholder.com/150'} onLoad={() => setLoading(false)}
+                        className={`w-full h-full object-contain p-2 transition-opacity ${loading ? 'opacity-0' : 'opacity-100'}`} />
                 </div>
             );
         };
@@ -61,10 +56,9 @@
             const [seccion, setSeccion] = useState('stock');
             const [busqueda, setBusqueda] = useState('');
             const [isAdmin, setIsAdmin] = useState(false);
-            const [mostrarLogin, setMostrarLogin] = useState(false);
-            const [modalPedido, setModalPedido] = useState(null);
-            const [form, setForm] = useState(null);
-            const [pedidoForm, setPedidoForm] = useState({ usuario: '', tarea: '', cantidad: 1 });
+            const [form, setForm] = useState(null); // Para Editar/Agregar
+            const [modalPedido, setModalPedido] = useState(null); // Para Solicitar
+            const [subiendoImg, setSubiendoImg] = useState(false);
 
             const fetchData = useCallback(async () => {
                 const [h, p, hi] = await Promise.all([
@@ -77,171 +71,159 @@
 
             useEffect(() => {
                 fetchData();
-                const sub = supabase.channel('realtime').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
+                const sub = supabase.channel('any').on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData()).subscribe();
                 return () => supabase.removeChannel(sub);
             }, [fetchData]);
 
-            const handleDelete = async (id) => {
-                if(confirm("¿ELIMINAR ESTE MATERIAL PERMANENTEMENTE?")) {
+            // FUNCIÓN PARA SUBIR IMAGEN (NUEVA O EDICIÓN)
+            const handleImageProcess = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setSubiendoImg(true);
+                const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
+                
+                const { data: uploadData, error } = await supabase.storage.from('fotos').upload(fileName, file);
+                
+                if (error) {
+                    alert("Error al subir imagen");
+                    setSubiendoImg(false);
+                    return;
+                }
+
+                const { data: { publicUrl } } = supabase.storage.from('fotos').getPublicUrl(fileName);
+                setForm(prev => ({ ...prev, foto_url: publicUrl }));
+                setSubiendoImg(false);
+            };
+
+            const saveTool = async () => {
+                if(!form.nombre || !form.foto_url) return alert("Nombre y Foto son obligatorios");
+                if (form.id) {
+                    await supabase.from('herramientas').update(form).eq('id', form.id);
+                } else {
+                    await supabase.from('herramientas').insert([form]);
+                }
+                setForm(null);
+            };
+
+            const deleteTool = async (id) => {
+                if(confirm("¿Seguro que quieres eliminar este material?")) {
                     await supabase.from('herramientas').delete().eq('id', id);
                     setForm(null);
                 }
             };
 
-            const filtrarStock = data.herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase()));
-
             return (
                 <div className="min-h-screen pb-20 px-4">
                     <header className="py-6 max-w-[1200px] mx-auto flex flex-col items-center sticky top-0 z-40 bg-[#020617]/90 backdrop-blur-xl">
-                        <h1 className="font-tech font-black text-xl mb-4 tracking-tighter">STOCK<span className="text-orange-500 font-black">MASTER</span></h1>
-                        <div className="flex gap-1 bg-white/5 p-1 rounded-2xl glass border border-white/10">
-                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
-                            {isAdmin && (
-                                <>
-                                    <button onClick={() => setSeccion('pedidos')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos</button>
-                                    <button onClick={() => setSeccion('historial')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>
-                                </>
-                            )}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase bg-white/10">{isAdmin ? 'Salir' : 'Admin'}</button>
+                        <h1 className="font-tech font-black text-xl mb-4 tracking-tighter uppercase">Stock<span className="text-orange-500">Master</span></h1>
+                        <div className="flex gap-1 glass p-1 rounded-2xl">
+                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
+                            {isAdmin && <button onClick={() => setSeccion('historial')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>}
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : (()=>{
+                                const p = prompt("CLAVE ADMIN:");
+                                if(p === ADMIN_PASSWORD) setIsAdmin(true);
+                            })()} className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase bg-white/5">{isAdmin ? 'Salir' : 'Admin'}</button>
                         </div>
                     </header>
 
-                    <main className="max-w-[1200px] mx-auto mt-4">
+                    <main className="max-w-[1200px] mx-auto">
                         {seccion === 'stock' && (
-                            <>
-                                <div className="flex gap-2 mb-6">
-                                    <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 bg-slate-900 border border-white/10 p-4 rounded-2xl outline-none focus:border-orange-500 font-bold uppercase text-xs" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, unidad: 'PZ', lugar: '', foto_url: '' })} className="bg-orange-600 px-6 rounded-2xl font-black text-2xl shadow-lg shadow-orange-500/30">+</button>}
-                                </div>
-                                <div className="grid-master">
-                                    {filtrarStock.map(h => (
-                                        <div key={h.id} className="glass rounded-[2rem] p-3 flex flex-col border-white/5">
-                                            <ImageWithLoader src={h.foto_url} agotado={h.cantidad <= 0} />
-                                            <h3 className="text-white font-black text-[10px] uppercase text-center h-10 flex items-center justify-center leading-tight">{h.nombre}</h3>
-                                            <div className="flex justify-between items-center px-1 mb-4">
-                                                <span className="text-[8px] font-black text-slate-500">{h.lugar || 'BODEGA'}</span>
-                                                <span className="text-orange-500 font-tech text-xs font-black">{h.cantidad} PZ</span>
-                                            </div>
-                                            <button onClick={() => isAdmin ? setForm(h) : setModalPedido(h)} disabled={h.cantidad <= 0 && !isAdmin} className={`w-full py-4 rounded-xl font-black text-[9px] uppercase transition-all ${isAdmin ? 'bg-slate-700' : 'bg-orange-600 active:scale-90 disabled:opacity-20'}`}>
-                                                {isAdmin ? '🔧 Gestionar' : '🛒 Solicitar'}
-                                            </button>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                {isAdmin && (
+                                    <div onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="glass rounded-[2rem] border-dashed border-2 border-orange-500/30 flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-orange-500/5">
+                                        <span className="text-4xl text-orange-500 mb-2">+</span>
+                                        <span className="text-[10px] font-black uppercase text-orange-500">Nuevo Material</span>
+                                    </div>
+                                )}
+                                {data.herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase())).map(h => (
+                                    <div key={h.id} className="glass rounded-[2rem] p-3 flex flex-col border-white/5 relative">
+                                        <ImageWithLoader src={h.foto_url} className="h-32 mb-2" />
+                                        <h3 className="text-[10px] font-black uppercase text-center h-8 flex items-center justify-center leading-tight mb-2">{h.nombre}</h3>
+                                        <div className="flex justify-between items-center mb-4 px-2">
+                                            <span className="text-[9px] font-tech text-orange-500">{h.cantidad} PZ</span>
+                                            <span className="text-[8px] text-slate-500 uppercase">{h.lugar}</span>
                                         </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-
-                        {seccion === 'historial' && (
-                            <div className="glass rounded-3xl overflow-hidden">
-                                {data.historial.map(hi => (
-                                    <div key={hi.id} className="flex items-center gap-4 p-4 border-b border-white/5 hover:bg-white/5">
-                                        <div className="w-16 h-16 shrink-0 bg-black rounded-xl overflow-hidden border border-white/10">
-                                            <img src={hi.foto_url} className="w-full h-full object-contain p-1" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="text-orange-500 font-black text-[11px] uppercase">{hi.herramienta_nombre}</div>
-                                            <div className="text-slate-400 font-bold text-[10px] uppercase">{hi.usuario}</div>
-                                            <div className="text-slate-600 text-[9px] mt-1">{new Date(hi.fecha).toLocaleDateString()} - {new Date(hi.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="font-tech text-white text-sm font-black">-{hi.cantidad}</div>
-                                            <div className="text-[8px] text-slate-500 font-black uppercase">RETIRADO</div>
-                                        </div>
+                                        <button onClick={() => isAdmin ? setForm(h) : setModalPedido(h)} className={`w-full py-3 rounded-xl font-black text-[9px] uppercase ${isAdmin ? 'bg-slate-700' : 'bg-orange-600'}`}>
+                                            {isAdmin ? 'Editar' : 'Solicitar'}
+                                        </button>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {seccion === 'pedidos' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {data.pedidos.map(p => (
-                                    <div key={p.id} className="glass p-4 rounded-2xl flex items-center gap-4 border-l-4 border-orange-600">
-                                        <img src={p.foto_url} className="w-14 h-14 object-contain rounded-xl bg-black" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-black text-orange-500 text-[10px] uppercase truncate">{p.herramienta_nombre}</p>
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase">{p.usuario_nombre}</p>
-                                            <p className="font-tech text-xs">{p.cantidad_pedida} PZ</p>
+                        {seccion === 'historial' && (
+                            <div className="glass rounded-3xl overflow-hidden divide-y divide-white/5">
+                                {data.historial.map(hi => (
+                                    <div key={hi.id} className="flex items-center gap-4 p-4">
+                                        <img src={hi.foto_url} className="w-12 h-12 rounded-lg bg-black object-contain" />
+                                        <div className="flex-1">
+                                            <p className="text-orange-500 font-black text-[10px] uppercase">{hi.herramienta_nombre}</p>
+                                            <p className="text-white text-[9px] font-bold uppercase">{hi.usuario} • {new Date(hi.fecha).toLocaleDateString()}</p>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={async () => await supabase.from('pedidos').delete().eq('id', p.id)} className="bg-red-500/20 text-red-500 p-3 rounded-xl font-black text-[10px]">X</button>
-                                            <button onClick={async () => {
-                                                const h = data.herramientas.find(i => i.id === p.herramienta_id);
-                                                if(!h || h.cantidad < p.cantidad_pedida) return alert("SIN STOCK");
-                                                await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
-                                                await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
-                                                await supabase.from('pedidos').delete().eq('id', p.id);
-                                            }} className="bg-green-600 px-4 rounded-xl font-black text-[10px] uppercase">Listo</button>
-                                        </div>
+                                        <div className="font-tech text-white text-sm">-{hi.cantidad}</div>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </main>
 
-                    {/* MODAL ADMIN: EDITAR / ELIMINAR */}
+                    {/* MODAL EDITAR / AGREGAR (ADMIN) */}
                     {form && (
-                        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
+                        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-6 backdrop-blur-md">
                             <div className="glass p-8 rounded-[2.5rem] w-full max-w-sm relative">
-                                <button onClick={() => setForm(null)} className="absolute top-6 right-6 text-slate-500 font-black text-xl">✕</button>
-                                <h2 className="font-black text-orange-500 mb-6 uppercase text-center text-sm">Gestionar Material</h2>
-                                <div className="space-y-4">
-                                    <ImageWithLoader src={form.foto_url} className="h-24" />
-                                    <input type="text" placeholder="NOMBRE" className="w-full bg-slate-900 p-4 rounded-xl font-bold uppercase text-xs" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
-                                    <input type="number" placeholder="STOCK" className="w-full bg-slate-900 p-4 rounded-xl font-bold text-xs" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
-                                    <input type="text" placeholder="LUGAR" className="w-full bg-slate-900 p-4 rounded-xl font-bold uppercase text-xs" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                <div className="btn-close" onClick={() => setForm(null)}>✕</div>
+                                <h2 className="text-center font-black text-orange-500 uppercase text-xs mb-6">Datos del Material</h2>
+                                
+                                <div className="flex flex-col items-center gap-4 mb-6">
+                                    <div className="w-32 h-32 bg-black/60 rounded-3xl overflow-hidden relative">
+                                        {subiendoImg ? (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-20"><div className="loader-spin"></div></div>
+                                        ) : null}
+                                        <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
+                                    </div>
+                                    <label className="bg-white/10 px-4 py-2 rounded-xl text-[9px] font-black uppercase cursor-pointer hover:bg-orange-500/20 transition-colors border border-white/10">
+                                        {form.foto_url ? 'Cambiar Imagen' : 'Subir Imagen'}
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleImageProcess} />
+                                    </label>
                                 </div>
+
+                                <div className="space-y-3">
+                                    <input type="text" placeholder="NOMBRE" className="w-full bg-slate-900 p-4 rounded-xl font-bold uppercase text-[10px] border border-white/5" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
+                                    <input type="number" placeholder="STOCK" className="w-full bg-slate-900 p-4 rounded-xl font-bold text-[10px] border border-white/5" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
+                                    <input type="text" placeholder="UBICACIÓN" className="w-full bg-slate-900 p-4 rounded-xl font-bold uppercase text-[10px] border border-white/5" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value})} />
+                                </div>
+
                                 <div className="mt-8 flex gap-2">
-                                    {form.id && <button onClick={() => handleDelete(form.id)} className="bg-red-600/20 text-red-500 px-4 rounded-xl">🗑</button>}
-                                    <button onClick={async () => {
-                                        if(form.id) await supabase.from('herramientas').update(form).eq('id', form.id);
-                                        else await supabase.from('herramientas').insert([form]);
-                                        setForm(null);
-                                    }} className="flex-1 py-4 font-black uppercase text-[10px] bg-orange-600 rounded-xl">Guardar</button>
+                                    {form.id && <button onClick={() => deleteTool(form.id)} className="bg-red-500/20 text-red-500 p-4 rounded-xl">🗑</button>}
+                                    <button onClick={saveTool} className="flex-1 bg-orange-600 py-4 rounded-xl font-black uppercase text-[10px]">Guardar Cambios</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* MODAL SOLICITUD CON CANCELAR */}
+                    {/* MODAL SOLICITAR (USUARIO) */}
                     {modalPedido && (
                         <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-6">
-                            <div className="glass p-8 rounded-[3rem] w-full max-w-xs text-center relative">
-                                <button onClick={() => setModalPedido(null)} className="absolute top-6 right-8 text-slate-500 font-black text-xl">✕</button>
-                                <ImageWithLoader src={modalPedido.foto_url} className="mb-4" />
-                                <h2 className="font-black text-orange-500 mb-6 uppercase text-xs px-4">{modalPedido.nombre}</h2>
-                                <input type="text" placeholder="TU NOMBRE" className="w-full bg-slate-900 p-4 rounded-2xl mb-2 text-center font-bold uppercase text-xs" value={pedidoForm.usuario} onChange={e => setPedidoForm({...pedidoForm, usuario: e.target.value})} />
-                                <input type="text" placeholder="ACTIVIDAD" className="w-full bg-slate-900 p-4 rounded-2xl mb-6 text-center font-bold uppercase text-xs" value={pedidoForm.tarea} onChange={e => setPedidoForm({...pedidoForm, tarea: e.target.value})} />
-                                <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl mb-8">
-                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.max(1, pedidoForm.cantidad-1)})} className="w-12 h-12 text-2xl text-orange-500 font-black">-</button>
-                                    <span className="font-tech text-xl font-black">{pedidoForm.cantidad}</span>
-                                    <button onClick={() => setPedidoForm({...pedidoForm, cantidad: Math.min(modalPedido.cantidad, pedidoForm.cantidad+1)})} className="w-12 h-12 text-2xl text-orange-500 font-black">+</button>
+                            <div className="glass p-8 rounded-[3rem] w-full max-w-xs text-center relative border border-orange-500/20">
+                                <div className="btn-close" onClick={() => setModalPedido(null)}>✕</div>
+                                <ImageWithLoader src={modalPedido.foto_url} className="h-32 mb-4" />
+                                <h3 className="font-black text-orange-500 uppercase text-[11px] mb-6">{modalPedido.nombre}</h3>
+                                <div className="space-y-2 mb-6">
+                                    <input type="text" placeholder="TU NOMBRE" className="w-full bg-slate-900 p-4 rounded-2xl text-center font-bold uppercase text-[10px]" onChange={e => setModalPedido({...modalPedido, user: e.target.value})} />
+                                    <input type="text" placeholder="ACTIVIDAD" className="w-full bg-slate-900 p-4 rounded-2xl text-center font-bold uppercase text-[10px]" onChange={e => setModalPedido({...modalPedido, task: e.target.value})} />
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setModalPedido(null)} className="flex-1 bg-slate-800 py-4 rounded-2xl font-black uppercase text-[9px]">Cancelar</button>
-                                    <button onClick={async () => {
-                                        if(!pedidoForm.usuario || !pedidoForm.tarea) return alert("RELLENA LOS DATOS");
-                                        await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: pedidoForm.usuario, tarea: pedidoForm.tarea, cantidad_pedida: pedidoForm.cantidad, foto_url: modalPedido.foto_url }]);
-                                        setModalPedido(null);
-                                    }} className="flex-[2] bg-orange-600 py-4 rounded-2xl font-black uppercase text-[9px]">Confirmar</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* LOGIN ADMIN */}
-                    {mostrarLogin && (
-                        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-6">
-                            <div className="glass p-8 rounded-[2rem] w-full max-w-[260px] text-center relative">
-                                <button onClick={() => setMostrarLogin(false)} className="absolute top-4 right-6 text-slate-600 text-xl">✕</button>
-                                <input type="password" placeholder="CLAVE" className="w-full bg-slate-900 p-4 rounded-xl text-center text-2xl outline-none border border-orange-500" autoFocus 
-                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false))} />
+                                <button onClick={async () => {
+                                    if(!modalPedido.user || !modalPedido.task) return alert("Faltan datos");
+                                    await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user, tarea: modalPedido.task, cantidad_pedida: 1, foto_url: modalPedido.foto_url }]);
+                                    setModalPedido(null);
+                                    alert("Pedido Enviado!");
+                                }} className="w-full bg-orange-600 py-4 rounded-2xl font-black uppercase text-[10px]">Confirmar Pedido</button>
                             </div>
                         </div>
                     )}
                 </div>
             );
         }
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
