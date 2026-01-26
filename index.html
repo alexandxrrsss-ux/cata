@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StockMaster Turbo v32.3</title>
+    <title>StockMaster Turbo v32.4</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -18,7 +18,7 @@
         .glass-card { background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.08); transition: transform 0.1s; }
         .tab-active { background: var(--orange) !important; color: white !important; box-shadow: 0 0 20px rgba(249, 115, 22, 0.5); }
         .btn-x { position: absolute; top: -10px; right: -10px; width: 32px; height: 32px; background: #ef4444; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .notif { position: fixed; top: 20px; right: 20px; padding: 15px 30px; border-radius: 12px; background: #10b981; color: white; font-weight: 900; font-size: 11px; z-index: 200; animation: slideIn 0.3s ease-out forwards; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); }
+        .notif { position: fixed; top: 20px; right: 20px; padding: 15px 30px; border-radius: 12px; background: #10b981; color: white; font-weight: 900; font-size: 11px; z-index: 250; animation: slideIn 0.3s ease-out forwards; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); }
         @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
         .loading-shimmer { background: linear-gradient(90deg, #f97316 25%, #fb923c 50%, #f97316 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
@@ -35,6 +35,9 @@
         const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'; 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const ADMIN_PASSWORD = "123";
+
+        // Función para normalizar búsqueda (quitar acentos y dejar en minúsculas)
+        const normalize = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
         function App() {
             const [data, setData] = useState({ herramientas: [], pedidos: [], historial: [] });
@@ -53,7 +56,7 @@
                 const [h, p, hi] = await Promise.all([
                     supabase.from('herramientas').select('*').order('nombre'),
                     supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
-                    supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(30)
+                    supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(50)
                 ]);
                 setData({ herramientas: h.data || [], pedidos: p.data || [], historial: hi.data || [] });
             }, []);
@@ -99,11 +102,11 @@
                         {seccion === 'stock' && (
                             <>
                                 <div className="flex gap-3 mb-8">
-                                    <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 p-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-inner" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                                    <input type="text" placeholder="BUSCAR (SIN ACENTOS O MAYÚS)..." className="flex-1 p-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-inner" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
                                     {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="bg-orange-600 px-7 rounded-2xl font-black text-3xl shadow-lg active:scale-90 transition-transform">+</button>}
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                                    {data.herramientas.filter(h => h.nombre.toLowerCase().includes(busqueda.toLowerCase())).map(h => {
+                                    {data.herramientas.filter(h => normalize(h.nombre).includes(normalize(busqueda))).map(h => {
                                         const isAgotado = h.cantidad <= 0;
                                         return (
                                             <div key={h.id} className="glass-card rounded-[2rem] p-4 flex flex-col relative transition-all">
@@ -128,7 +131,7 @@
                                 </div>
                             </>
                         )}
-                        {/* Secciones Pedidos e Historial sin cambios para mantener estabilidad */}
+
                         {seccion === 'pedidos' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {data.pedidos.map(p => (
@@ -141,7 +144,7 @@
                                             const h = data.herramientas.find(i => i.id === p.herramienta_id);
                                             if(!h || h.cantidad < p.cantidad_pedida) { alert("SIN STOCK"); setIsWorking(false); return; }
                                             await supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id);
-                                            await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toISOString() }]);
+                                            await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toLocaleString() }]);
                                             await supabase.from('pedidos').delete().eq('id', p.id);
                                             showMsg("DESPACHADO"); setIsWorking(false);
                                         }} className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase ${isWorking ? 'loading-shimmer' : 'bg-green-600'}`}>LISTO</button>
@@ -149,23 +152,35 @@
                                 ))}
                             </div>
                         )}
+
                         {seccion === 'historial' && (
-                            <div className="glass rounded-[2rem] border border-white/5">
+                            <div className="glass rounded-[2rem] border border-white/5 overflow-hidden">
                                 {data.historial.map(hi => (
-                                    <div key={hi.id} className="flex items-center gap-4 p-4 border-b border-white/5"><img src={hi.foto_url} className="w-12 h-12 object-contain bg-black rounded-xl" /><div className="flex-1"><p className="text-white font-black text-[10px] uppercase">{hi.herramienta_nombre}</p><p className="text-slate-400 text-[9px] uppercase font-bold tracking-widest">{hi.usuario} • {hi.tarea}</p></div><div className="font-tech text-white text-lg">-{hi.cantidad}</div></div>
+                                    <div key={hi.id} className="flex items-center gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+                                        <img src={hi.foto_url} className="w-12 h-12 object-contain bg-black rounded-xl" />
+                                        <div className="flex-1">
+                                            <p className="text-white font-black text-[10px] uppercase">{hi.herramienta_nombre}</p>
+                                            <p className="text-slate-400 text-[8px] uppercase font-bold tracking-widest">{hi.usuario} • {hi.tarea}</p>
+                                            <p className="text-orange-500 text-[7px] font-black uppercase mt-1 opacity-60 italic">{hi.fecha}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="font-tech text-white text-lg">-{hi.cantidad}</div>
+                                            <button onClick={async () => { if(confirm("¿ELIMINAR REGISTRO?")) { await supabase.from('historial').delete().eq('id', hi.id); showMsg("ELIMINADO"); }}} className="w-8 h-8 flex items-center justify-center bg-red-600/10 text-red-500 rounded-lg text-xs">🗑</button>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
                         )}
                     </main>
 
-                    {/* MODAL GESTION ADMIN (PREVIEW INTEGRADA) */}
+                    {/* MODAL GESTION ADMIN */}
                     {form && (
                         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
                             <div className="bg-[#0f172a] p-10 rounded-[3rem] w-full max-w-sm relative border border-white/10 shadow-2xl">
                                 <div className="btn-x" onClick={() => !isWorking && setForm(null)}>✕</div>
                                 <div className="w-40 h-40 bg-black mx-auto mb-8 rounded-[2rem] overflow-hidden relative border border-white/10 group shadow-inner">
                                     <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
-                                    <label className="absolute inset-0 bg-orange-600/70 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[10px] font-black uppercase text-center p-4">
+                                    <label className="absolute inset-0 bg-orange-600/70 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[10px] font-black uppercase text-center p-4 transition-all">
                                         SUBIR FOTO
                                         <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={isWorking} />
                                     </label>
@@ -189,28 +204,39 @@
                         </div>
                     )}
 
-                    {/* MODAL PEDIDO USUARIO */}
+                    {/* MODAL PEDIDO USUARIO - BLOQUEO TOTAL AL ENVIAR */}
                     {modalPedido && (
                         <div className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-6 backdrop-blur-md">
-                            <div className="bg-[#0f172a] p-8 rounded-[3rem] w-full max-w-sm relative text-center border border-orange-500/30">
-                                <div className="btn-x" onClick={() => !isWorking && setModalPedido(null)}>✕</div>
+                            <div className={`bg-[#0f172a] p-8 rounded-[3rem] w-full max-w-sm relative text-center border border-orange-500/30 transition-all ${isWorking ? 'opacity-50 pointer-events-none scale-95' : ''}`}>
+                                {!isWorking && <div className="btn-x" onClick={() => setModalPedido(null)}>✕</div>}
                                 <img src={modalPedido.foto_url} className="h-32 mx-auto mb-6 object-contain" />
                                 <h2 className="text-orange-500 font-black uppercase text-xs mb-8 tracking-widest">{modalPedido.nombre}</h2>
-                                <div className="space-y-3 mb-8">
-                                    <input type="text" placeholder="TU NOMBRE" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase" value={modalPedido.user_name} onChange={e => setModalPedido({...modalPedido, user_name: e.target.value.toUpperCase()})} disabled={isWorking} />
-                                    <input type="text" placeholder="ACTIVIDAD" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase" value={modalPedido.job} onChange={e => setModalPedido({...modalPedido, job: e.target.value.toUpperCase()})} disabled={isWorking} />
-                                </div>
-                                <div className="flex items-center justify-between bg-white/5 p-3 rounded-[2rem] mb-8 border border-white/10 shadow-inner">
-                                    <button disabled={isWorking} onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500">-</button>
-                                    <span className="font-tech text-3xl text-white">{modalPedido.pedido_cant}</span>
-                                    <button disabled={isWorking} onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500">+</button>
-                                </div>
-                                <button disabled={isWorking} onClick={async () => {
-                                    if(!modalPedido.user_name || !modalPedido.job) return alert("DATOS INCOMPLETOS");
-                                    setIsWorking(true);
-                                    await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
-                                    setModalPedido(null); showMsg("ENVIADO"); setIsWorking(false);
-                                }} className={`w-full py-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest ${isWorking ? 'loading-shimmer' : 'bg-orange-600'}`}>CONFIRMAR PEDIDO</button>
+                                {isWorking ? (
+                                    <div className="py-20 flex flex-col items-center">
+                                        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                        <p className="font-tech text-xs text-white uppercase animate-pulse">ENVIANDO SOLICITUD AL ADMIN...</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="space-y-3 mb-8">
+                                            <input type="text" placeholder="TU NOMBRE" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase tracking-widest" value={modalPedido.user_name} onChange={e => setModalPedido({...modalPedido, user_name: e.target.value.toUpperCase()})} />
+                                            <input type="text" placeholder="ACTIVIDAD" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase tracking-widest" value={modalPedido.job} onChange={e => setModalPedido({...modalPedido, job: e.target.value.toUpperCase()})} />
+                                        </div>
+                                        <div className="flex items-center justify-between bg-white/5 p-3 rounded-[2rem] mb-8 border border-white/10 shadow-inner">
+                                            <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500">-</button>
+                                            <span className="font-tech text-3xl text-white">{modalPedido.pedido_cant}</span>
+                                            <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500">+</button>
+                                        </div>
+                                        <button onClick={async () => {
+                                            if(!modalPedido.user_name || !modalPedido.job) return alert("DATOS INCOMPLETOS");
+                                            setIsWorking(true);
+                                            await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
+                                            setModalPedido(null); 
+                                            showMsg("ÉXITO: ENVIADO AL ADMIN"); 
+                                            setIsWorking(false);
+                                        }} className="w-full py-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest bg-orange-600 shadow-orange-900/40 shadow-xl">CONFIRMAR PEDIDO</button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}
@@ -220,7 +246,7 @@
                         <div className="fixed inset-0 z-[110] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
                             <div className="bg-[#0f172a] p-10 rounded-[3rem] w-full max-w-[280px] text-center border border-white/10 shadow-2xl">
                                 <div className="btn-x" onClick={() => setMostrarLogin(false)}>✕</div>
-                                <input type="password" placeholder="••••" className="w-full p-5 rounded-2xl text-center text-4xl font-tech text-orange-500 tracking-widest bg-black/60" autoFocus 
+                                <input type="password" placeholder="••••" className="w-full p-5 rounded-2xl text-center text-4xl font-tech text-orange-500 tracking-widest bg-black/60 shadow-inner" autoFocus 
                                     onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), showMsg("HOLA JEFE"))} />
                             </div>
                         </div>
