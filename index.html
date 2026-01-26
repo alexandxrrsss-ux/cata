@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StockMaster Turbo v32.5 - Ultra Fast</title>
+    <title>StockMaster Turbo v32.6 - Fast Delete</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -65,12 +65,10 @@
                 return () => supabase.removeChannel(channel);
             }, [sync]);
 
-            // DESPACHO ULTRA RÁPIDO (Actualización Optimista)
             const despachar = async (p) => {
                 const h = data.herramientas.find(i => i.id === p.herramienta_id);
-                if(!h || h.cantidad < p.cantidad_pedida) return alert("SIN STOCK SUFICIENTE");
-
-                // 1. Quitar de la vista inmediatamente (Modo Flash)
+                if(!h || h.cantidad < p.cantidad_pedida) return alert("SIN STOCK");
+                
                 setData(prev => ({
                     ...prev,
                     pedidos: prev.pedidos.filter(item => item.id !== p.id),
@@ -84,21 +82,25 @@
                         fecha: new Date().toLocaleString()
                     }, ...prev.historial]
                 }));
-                showMsg("DESPACHADO AL INSTANTE");
+                showMsg("DESPACHADO");
 
-                // 2. Hacer el trabajo pesado en segundo plano
                 await Promise.all([
                     supabase.from('herramientas').update({ cantidad: h.cantidad - p.cantidad_pedida }).eq('id', h.id),
-                    supabase.from('historial').insert([{ 
-                        herramienta_nombre: p.herramienta_nombre, 
-                        usuario: p.usuario_nombre, 
-                        cantidad: p.cantidad_pedida, 
-                        tarea: p.tarea, 
-                        foto_url: p.foto_url, 
-                        fecha: new Date().toLocaleString() 
-                    }]),
+                    supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url, fecha: new Date().toLocaleString() }]),
                     supabase.from('pedidos').delete().eq('id', p.id)
                 ]);
+            };
+
+            const borrarHistorialFast = async (id) => {
+                if(!confirm("¿BORRAR REGISTRO?")) return;
+                // Actualización optimista: borrar de la vista de inmediato
+                setData(prev => ({
+                    ...prev,
+                    historial: prev.historial.filter(h => h.id !== id)
+                }));
+                showMsg("ELIMINADO");
+                // Borrar en la base en segundo plano
+                await supabase.from('historial').delete().eq('id', id);
             };
 
             const handleUpload = async (e) => {
@@ -137,14 +139,14 @@
                             <>
                                 <div className="flex gap-3 mb-8">
                                     <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 p-4 rounded-2xl text-[11px] font-black uppercase" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="bg-orange-600 px-7 rounded-2xl font-black text-3xl">+</button>}
+                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="bg-orange-600 px-7 rounded-2xl font-black text-3xl shadow-lg">+</button>}
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                                     {data.herramientas.filter(h => normalize(h.nombre).includes(normalize(busqueda))).map(h => {
                                         const isAgotado = h.cantidad <= 0;
                                         return (
-                                            <div key={h.id} className="glass-card rounded-[2rem] p-4 flex flex-col relative">
-                                                {isAgotado && <div className="absolute inset-0 z-10 agotado-overlay rounded-[2rem] flex items-center justify-center"><span className="bg-red-600 text-white font-black text-[10px] px-3 py-1 rounded-full rotate-[-15deg]">AGOTADO</span></div>}
+                                            <div key={h.id} className="glass-card rounded-[2rem] p-4 flex flex-col relative transition-all">
+                                                {isAgotado && <div className="absolute inset-0 z-10 agotado-overlay rounded-[2rem] flex items-center justify-center"><span className="bg-red-600 text-white font-black text-[10px] px-3 py-1 rounded-full rotate-[-15deg] shadow-lg">AGOTADO</span></div>}
                                                 <div className="w-full h-32 bg-black/40 rounded-2xl mb-3 flex items-center justify-center overflow-hidden">
                                                     <img src={h.foto_url || 'https://via.placeholder.com/150'} className={`w-full h-full object-contain p-2 ${isAgotado ? 'grayscale' : ''}`} />
                                                 </div>
@@ -186,7 +188,7 @@
                         {seccion === 'historial' && (
                             <div className="glass rounded-[2rem] border border-white/5 overflow-hidden">
                                 {data.historial.map(hi => (
-                                    <div key={hi.id} className="flex items-center gap-4 p-4 border-b border-white/5">
+                                    <div key={hi.id} className="flex items-center gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
                                         <img src={hi.foto_url} className="w-12 h-12 object-contain bg-black rounded-xl" />
                                         <div className="flex-1">
                                             <p className="text-white font-black text-[10px] uppercase">{hi.herramienta_nombre}</p>
@@ -195,7 +197,7 @@
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="font-tech text-white text-lg">-{hi.cantidad}</div>
-                                            <button onClick={async () => { if(confirm("¿BORRAR?")) { await supabase.from('historial').delete().eq('id', hi.id); showMsg("BORRADO"); }}} className="w-8 h-8 bg-red-600/10 text-red-500 rounded-lg text-xs font-black">🗑</button>
+                                            <button onClick={() => borrarHistorialFast(hi.id)} className="w-8 h-8 bg-red-600/10 text-red-500 rounded-lg text-xs font-black active:scale-90 transition-transform">🗑</button>
                                         </div>
                                     </div>
                                 ))}
@@ -208,9 +210,9 @@
                         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
                             <div className="bg-[#0f172a] p-10 rounded-[3rem] w-full max-w-sm relative border border-white/10 shadow-2xl">
                                 <div className="btn-x" onClick={() => !isWorking && setForm(null)}>✕</div>
-                                <div className="w-40 h-40 bg-black mx-auto mb-8 rounded-[2rem] overflow-hidden relative border border-white/10 group">
+                                <div className="w-40 h-40 bg-black mx-auto mb-8 rounded-[2rem] overflow-hidden relative border border-white/10 group shadow-inner">
                                     <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
-                                    <label className="absolute inset-0 bg-orange-600/70 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[10px] font-black uppercase">
+                                    <label className="absolute inset-0 bg-orange-600/70 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[10px] font-black uppercase text-center p-4">
                                         SUBIR FOTO
                                         <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={isWorking} />
                                     </label>
@@ -228,7 +230,7 @@
                                     if(form.id) await supabase.from('herramientas').update(payload).eq('id', form.id);
                                     else await supabase.from('herramientas').insert([payload]);
                                     setForm(null); showMsg("GUARDADO"); setIsWorking(false);
-                                }} className="w-full mt-8 py-5 rounded-2xl font-black text-[11px] uppercase bg-orange-600">CONFIRMAR</button>
+                                }} className="w-full mt-8 py-5 rounded-2xl font-black text-[11px] uppercase bg-orange-600 shadow-xl">CONFIRMAR</button>
                             </div>
                         </div>
                     )}
@@ -251,7 +253,7 @@
                                             <input type="text" placeholder="TU NOMBRE" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase" value={modalPedido.user_name} onChange={e => setModalPedido({...modalPedido, user_name: e.target.value.toUpperCase()})} />
                                             <input type="text" placeholder="ACTIVIDAD" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase" value={modalPedido.job} onChange={e => setModalPedido({...modalPedido, job: e.target.value.toUpperCase()})} />
                                         </div>
-                                        <div className="flex items-center justify-between bg-white/5 p-3 rounded-[2rem] mb-8 border border-white/10">
+                                        <div className="flex items-center justify-between bg-white/5 p-3 rounded-[2rem] mb-8 border border-white/10 shadow-inner">
                                             <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500">-</button>
                                             <span className="font-tech text-3xl text-white">{modalPedido.pedido_cant}</span>
                                             <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500">+</button>
