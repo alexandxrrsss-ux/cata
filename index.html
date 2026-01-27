@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StockMaster v33.8 - Full Original Fixed</title>
+    <title>StockMaster v34.0 - Final Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -46,6 +46,7 @@
             const [notif, setNotif] = useState("");
             const [isWorking, setIsWorking] = useState(false);
             
+            // Ref para bloquear sincronización externa durante operaciones críticas
             const blockSync = useRef(false);
 
             const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 3000); };
@@ -62,37 +63,37 @@
 
             useEffect(() => {
                 sync();
-                const channel = supabase.channel('db-changes').on('postgres_changes', { event: '*', schema: 'public' }, () => sync()).subscribe();
+                const channel = supabase.channel('db-live').on('postgres_changes', { event: '*', schema: 'public' }, () => sync()).subscribe();
                 return () => supabase.removeChannel(channel);
             }, [sync]);
 
-            // BORRADO DEFINITIVO ARREGLADO
-            const borrarHistorial = async (item) => {
+            // BORRADO DEFINITIVO (Usando la Primary Key que activaste)
+            const borrarHistorial = async (id) => {
                 if(!confirm("¿BORRAR PERMANENTE?")) return;
                 
-                blockSync.current = true; // Frenamos el Realtime
+                blockSync.current = true; // Pausamos el Realtime para que no regrese el dato
                 
-                // 1. Lo quitamos de la vista inmediatamente por su ID único
+                // 1. Eliminación visual inmediata
                 setData(prev => ({ 
                     ...prev, 
-                    historial: prev.historial.filter(h => h.id !== item.id) 
+                    historial: prev.historial.filter(h => h.id !== id) 
                 }));
                 
                 showMsg("ELIMINANDO...");
 
-                // 2. Borrado estricto por ID en Supabase
-                const { error } = await supabase.from('historial').delete().eq('id', item.id);
+                // 2. Borrado real en DB
+                const { error } = await supabase.from('historial').delete().eq('id', id);
 
                 if(error) {
-                    alert("No se pudo borrar de la base de datos");
+                    alert("Error al borrar: " + error.message);
                     sync(true);
                 }
 
-                // 3. Esperamos 3 segundos para que el cambio se asiente en el servidor
+                // 3. Pequeña espera para que el servidor procese y desbloqueamos
                 setTimeout(() => {
                     blockSync.current = false;
                     sync(true);
-                }, 3000);
+                }, 2000);
             };
 
             const despachar = async (p) => {
@@ -136,12 +137,12 @@
                     {notif && <div className="notif font-tech">✓ {notif}</div>}
                     
                     <header className="sticky top-0 z-40 glass p-4 flex flex-col items-center">
-                        <div className="font-tech font-black text-2xl tracking-tighter mb-4 italic uppercase">STOCK<span className="text-orange-500">PRO</span></div>
+                        <div className="font-tech font-black text-2xl tracking-tighter mb-4 italic uppercase text-white">STOCK<span className="text-orange-500">PRO</span></div>
                         <nav className="flex gap-2 p-1.5 bg-white/5 rounded-2xl border border-white/10">
                             <button onClick={() => setSeccion('stock')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase ${seccion === 'stock' ? 'tab-active' : ''}`}>Stock</button>
                             {isAdmin && <button onClick={() => setSeccion('pedidos')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase ${seccion === 'pedidos' ? 'tab-active' : ''}`}>Pedidos ({data.pedidos.length})</button>}
                             {isAdmin && <button onClick={() => setSeccion('historial')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase ${seccion === 'historial' ? 'tab-active' : ''}`}>Historial</button>}
-                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-5 py-2 rounded-xl text-[10px] font-black uppercase bg-white/10 border border-white/5">{isAdmin ? 'Salir' : 'Admin'}</button>
+                            <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-5 py-2 rounded-xl text-[10px] font-black uppercase bg-white/10 border border-white/5 text-white">{isAdmin ? 'Salir' : 'Admin'}</button>
                         </nav>
                     </header>
 
@@ -150,11 +151,11 @@
                             <>
                                 <div className="flex gap-3 mb-8">
                                     <input type="text" placeholder="BUSCAR MATERIAL..." className="flex-1 p-4 rounded-2xl text-[11px] font-black uppercase" value={busqueda} onChange={e => setBusqueda(e.target.value)} />
-                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="bg-orange-600 px-7 rounded-2xl font-black text-3xl">+</button>}
+                                    {isAdmin && <button onClick={() => setForm({ nombre: '', cantidad: 0, lugar: '', foto_url: '' })} className="bg-orange-600 px-7 rounded-2xl font-black text-3xl text-white shadow-lg">+</button>}
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                                     {data.herramientas.filter(h => normalize(h.nombre).includes(normalize(busqueda))).map(h => (
-                                        <div key={h.id} className="glass-card rounded-[2rem] p-4 flex flex-col relative">
+                                        <div key={h.id} className="glass-card rounded-[2rem] p-4 flex flex-col relative text-white">
                                             {h.cantidad <= 0 && <div className="absolute inset-0 z-10 agotado-overlay rounded-[2rem] flex items-center justify-center"><span className="bg-red-600 text-white font-black text-[10px] px-3 py-1 rounded-full rotate-[-15deg] uppercase">Agotado</span></div>}
                                             <div className="w-full h-32 bg-black/40 rounded-2xl mb-3 flex items-center justify-center overflow-hidden">
                                                 <img src={h.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
@@ -165,7 +166,7 @@
                                                 <span className={`font-tech text-xs font-black ${h.cantidad <= 0 ? 'text-red-500' : 'text-orange-500'}`}>{h.cantidad} PZ</span>
                                             </div>
                                             <button onClick={() => isAdmin ? setForm(h) : setModalPedido({...h, user_name: '', job: '', pedido_cant: 1})} disabled={h.cantidad <= 0 && !isAdmin}
-                                                className={`w-full py-3.5 rounded-2xl font-black text-[10px] uppercase transition-all z-20 ${h.cantidad <= 0 && !isAdmin ? 'bg-slate-900 text-slate-600' : (isAdmin ? 'bg-slate-700' : 'bg-orange-600')}`}>
+                                                className={`w-full py-3.5 rounded-2xl font-black text-[10px] uppercase transition-all z-20 ${h.cantidad <= 0 && !isAdmin ? 'bg-slate-900 text-slate-600' : (isAdmin ? 'bg-slate-700' : 'bg-orange-600 text-white')}`}>
                                                 {isAdmin ? 'Editar' : 'Pedir'}
                                             </button>
                                         </div>
@@ -175,9 +176,9 @@
                         )}
 
                         {seccion === 'historial' && (
-                            <div className="glass rounded-[2rem] border border-white/5 overflow-hidden">
+                            <div className="glass rounded-[2rem] border border-white/5 overflow-hidden text-white">
                                 {data.historial.map(hi => (
-                                    <div key={hi.id} className="flex items-center gap-4 p-4 border-b border-white/5">
+                                    <div key={hi.id} className="flex items-center gap-4 p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
                                         <img src={hi.foto_url} className="w-12 h-12 object-contain bg-black rounded-xl" />
                                         <div className="flex-1 min-w-0">
                                             <p className="text-white font-black text-[10px] uppercase truncate">{hi.herramienta_nombre}</p>
@@ -186,7 +187,7 @@
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="font-tech text-white text-lg">-{hi.cantidad}</div>
-                                            <button onClick={() => borrarHistorial(hi)} className="w-10 h-10 bg-red-600/10 text-red-500 rounded-xl text-xs font-black flex items-center justify-center">🗑</button>
+                                            <button onClick={() => borrarHistorial(hi.id)} className="w-10 h-10 bg-red-600/10 text-red-500 rounded-xl text-xs font-black flex items-center justify-center border border-red-500/20 active:bg-red-600 active:text-white transition-all">🗑</button>
                                         </div>
                                     </div>
                                 ))}
@@ -204,22 +205,22 @@
                                             <p className="text-white text-[10px] font-bold uppercase">{p.usuario_nombre}</p>
                                             <div className="font-tech text-xl">{p.cantidad_pedida} PZ</div>
                                         </div>
-                                        <button onClick={() => despachar(p)} className="px-6 py-4 rounded-2xl font-black text-[10px] uppercase bg-green-600 text-white active:scale-90 transition-transform">LISTO</button>
+                                        <button onClick={() => despachar(p)} className="px-6 py-4 rounded-2xl font-black text-[10px] uppercase bg-green-600 text-white active:scale-90 transition-transform shadow-lg">LISTO</button>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </main>
 
-                    {/* MODAL ADMIN EDIT (EL QUE TE HABIA QUITADO) */}
+                    {/* MODAL ADMIN EDIT */}
                     {form && (
-                        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
-                            <div className="bg-[#0f172a] p-10 rounded-[3rem] w-full max-w-sm relative border border-white/10 text-white">
+                        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl text-white">
+                            <div className="bg-[#0f172a] p-10 rounded-[3rem] w-full max-w-sm relative border border-white/10 shadow-2xl">
                                 <div className="btn-x" onClick={() => !isWorking && setForm(null)}>✕</div>
                                 <div className="w-40 h-40 bg-black mx-auto mb-8 rounded-[2rem] overflow-hidden relative border border-white/10 group">
                                     <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-2" />
-                                    <label className="absolute inset-0 bg-orange-600/70 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[10px] font-black uppercase text-center p-4">
-                                        SUBIR FOTO
+                                    <label className="absolute inset-0 bg-orange-600/70 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[10px] font-black uppercase text-center p-4 transition-all">
+                                        CAMBIAR FOTO
                                         <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
                                     </label>
                                 </div>
@@ -235,33 +236,33 @@
                                     if(form.id) await supabase.from('herramientas').update({...form}).eq('id', form.id);
                                     else await supabase.from('herramientas').insert([{...form}]);
                                     setForm(null); setIsWorking(false); sync(true);
-                                }} className="w-full mt-8 py-5 rounded-2xl font-black text-[11px] uppercase bg-orange-600">CONFIRMAR</button>
+                                }} className="w-full mt-8 py-5 rounded-2xl font-black text-[11px] uppercase bg-orange-600 shadow-lg shadow-orange-900/20 text-white">GUARDAR</button>
                             </div>
                         </div>
                     )}
 
                     {/* MODAL PEDIDO USUARIO */}
                     {modalPedido && (
-                        <div className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-6 backdrop-blur-md">
-                            <div className={`bg-[#0f172a] p-8 rounded-[3rem] w-full max-w-sm relative text-center border border-orange-500/30 text-white ${isWorking ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <div className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-6 backdrop-blur-md text-white">
+                            <div className={`bg-[#0f172a] p-8 rounded-[3rem] w-full max-w-sm relative text-center border border-orange-500/30 ${isWorking ? 'opacity-50 pointer-events-none' : ''}`}>
                                 {!isWorking && <div className="btn-x" onClick={() => setModalPedido(null)}>✕</div>}
                                 <img src={modalPedido.foto_url} className="h-32 mx-auto mb-6 object-contain" />
                                 <h2 className="text-orange-500 font-black uppercase text-xs mb-8">{modalPedido.nombre}</h2>
                                 <div className="space-y-3 mb-8">
                                     <input type="text" placeholder="TU NOMBRE" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase" value={modalPedido.user_name} onChange={e => setModalPedido({...modalPedido, user_name: e.target.value.toUpperCase()})} />
-                                    <input type="text" placeholder="TAREA" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase" value={modalPedido.job} onChange={e => setModalPedido({...modalPedido, job: e.target.value.toUpperCase()})} />
+                                    <input type="text" placeholder="¿PARA QUÉ ACTIVIDAD?" className="w-full p-5 rounded-2xl text-center text-[10px] font-black uppercase" value={modalPedido.job} onChange={e => setModalPedido({...modalPedido, job: e.target.value.toUpperCase()})} />
                                 </div>
-                                <div className="flex items-center justify-between bg-white/5 p-3 rounded-[2rem] mb-8">
-                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500">-</button>
+                                <div className="flex items-center justify-between bg-white/5 p-3 rounded-[2rem] mb-8 border border-white/10 shadow-inner">
+                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500 active:scale-95 transition-transform">-</button>
                                     <span className="font-tech text-3xl">{modalPedido.pedido_cant}</span>
-                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500">+</button>
+                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-14 h-14 bg-white/10 rounded-2xl text-2xl font-black text-orange-500 active:scale-95 transition-transform">+</button>
                                 </div>
                                 <button onClick={async () => {
-                                    if(!modalPedido.user_name) return alert("PON TU NOMBRE");
+                                    if(!modalPedido.user_name) return alert("DINOS QUIÉN ERES");
                                     setIsWorking(true);
                                     await supabase.from('pedidos').insert([{ herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url }]);
-                                    setModalPedido(null); setIsWorking(false); showMsg("PEDIDO ENVIADO"); sync(true);
-                                }} className="w-full py-5 rounded-[2rem] font-black text-[11px] uppercase bg-orange-600">CONFIRMAR</button>
+                                    setModalPedido(null); setIsWorking(false); showMsg("SOLICITUD ENVIADA"); sync(true);
+                                }} className="w-full py-5 rounded-[2rem] font-black text-[11px] uppercase bg-orange-600 shadow-xl shadow-orange-900/40 text-white">PEDIR AHORA</button>
                             </div>
                         </div>
                     )}
@@ -271,8 +272,8 @@
                         <div className="fixed inset-0 z-[110] bg-black/95 flex items-center justify-center p-6 backdrop-blur-xl">
                             <div className="bg-[#0f172a] p-10 rounded-[3rem] w-full max-w-[280px] text-center border border-white/10 shadow-2xl">
                                 <div className="btn-x" onClick={() => setMostrarLogin(false)}>✕</div>
-                                <input type="password" placeholder="••••" className="w-full p-5 rounded-2xl text-center text-4xl font-tech text-orange-500 bg-black/60 shadow-inner" autoFocus 
-                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false))} />
+                                <input type="password" placeholder="••••" className="w-full p-5 rounded-2xl text-center text-4xl font-tech text-orange-500 bg-black/60 tracking-widest" autoFocus 
+                                    onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), showMsg("ACCESO TOTAL"))} />
                             </div>
                         </div>
                     )}
