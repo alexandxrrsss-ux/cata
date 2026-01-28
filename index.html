@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StockMaster Elite v52.0</title>
+    <title>StockMaster Elite v53.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -45,18 +45,24 @@
             const [form, setForm] = useState(null);
             const [notif, setNotif] = useState("");
             const [isWorking, setIsWorking] = useState(false);
-            const blockSync = useRef(false);
-
+            
             const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 3000); };
 
-            const sync = useCallback(async (force = false) => {
-                if (blockSync.current && !force) return;
+            const sync = useCallback(async () => {
+                // No bloqueamos la UI aquí para evitar el efecto de "borrado"
                 const [h, p, hi] = await Promise.all([
                     supabase.from('herramientas').select('*').order('nombre', { ascending: true }),
                     supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
                     supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(60)
                 ]);
-                setData({ herramientas: h.data || [], pedidos: p.data || [], historial: hi.data || [] });
+                
+                if (h.data) {
+                    setData(prev => ({
+                        herramientas: h.data,
+                        pedidos: p.data || [],
+                        historial: hi.data || []
+                    }));
+                }
             }, []);
 
             useEffect(() => {
@@ -65,10 +71,7 @@
                 return () => supabase.removeChannel(channel);
             }, [sync]);
 
-            // FUNCIÓN PARA QUITAR ACENTOS Y NORMALIZAR BÚSQUEDA
-            const normalizar = (texto) => {
-                return texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            };
+            const normalizar = (texto) => texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
             const despachar = async (p) => {
                 setIsWorking(true);
@@ -78,7 +81,7 @@
                     if(h) await supabase.from('herramientas').update({ cantidad: Math.max(0, h.cantidad - p.cantidad_pedida) }).eq('id', h.id);
                     await supabase.from('pedidos').delete().eq('id', p.id);
                     showMsg("ENTREGADO CON ÉXITO");
-                    await sync(true);
+                    await sync();
                 } catch (e) { console.error(e); } finally { setIsWorking(false); }
             };
 
@@ -88,16 +91,13 @@
                 try {
                     await supabase.from('historial').delete().eq('id', hi.id);
                     showMsg("BORRADO CON ÉXITO");
-                    await sync(true);
+                    await sync();
                 } catch (e) { console.error(e); } finally { setIsWorking(false); }
             };
 
             const handleUpload = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => setForm(prev => ({ ...prev, foto_url: event.target.result }));
-                reader.readAsDataURL(file);
                 setIsWorking(true);
                 const name = `${Date.now()}_${file.name}`;
                 const { error } = await supabase.storage.from('fotos').upload(name, file);
@@ -120,7 +120,7 @@
                     }]);
                     setModalPedido(null);
                     showMsg("PEDIDO ENVIADO CON ÉXITO");
-                    await sync(true);
+                    await sync();
                 } catch (e) { console.error(e); } finally { setIsWorking(false); }
             };
 
@@ -156,7 +156,7 @@
                                     {data.herramientas.filter(h => normalizar(h.nombre).includes(normalizar(busqueda))).map(h => (
                                         <div key={h.id} className="glass-card rounded-[2rem] p-4 flex flex-col text-white relative">
                                             <div className="w-full h-32 bg-black/40 rounded-[1.5rem] mb-3 flex items-center justify-center overflow-hidden border border-white/5">
-                                                <img src={h.foto_url} className="w-full h-full object-contain p-2" />
+                                                <img src={h.foto_url} className="w-full h-full object-contain p-2" loading="lazy" />
                                             </div>
                                             <h3 className="text-[10px] font-black uppercase text-center min-h-[40px] flex items-center justify-center mb-2 px-1 break-words leading-tight">{h.nombre}</h3>
                                             <div className="flex justify-between items-center mb-4 px-2">
@@ -178,7 +178,7 @@
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {data.pedidos.map(p => (
                                     <div key={p.id} className="glass-card p-5 rounded-[2.5rem] flex items-center gap-5 border-l-[6px] border-orange-600 text-white relative">
-                                        <button onClick={async() => { if(confirm("¿CANCELAR?")) { await supabase.from('pedidos').delete().eq('id', p.id); sync(true); } }} className="btn-x text-[10px]">✕</button>
+                                        <button onClick={async() => { if(confirm("¿CANCELAR?")) { await supabase.from('pedidos').delete().eq('id', p.id); sync(); } }} className="btn-x text-[10px]">✕</button>
                                         <img src={p.foto_url} className="w-20 h-20 object-contain bg-black/40 rounded-2xl p-2 border border-white/5" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-black text-orange-500 text-xs uppercase mb-1 leading-tight">{p.herramienta_nombre}</p>
@@ -255,7 +255,7 @@
                                     setIsWorking(true);
                                     if(form.id) await supabase.from('herramientas').update({...form}).eq('id', form.id);
                                     else await supabase.from('herramientas').insert([{...form}]);
-                                    setForm(null); setIsWorking(false); showMsg("GUARDADO CORRECTO"); sync(true);
+                                    setForm(null); setIsWorking(false); showMsg("GUARDADO CORRECTO"); sync();
                                 }} className="w-full py-5 rounded-[1.5rem] font-black text-[11px] btn-primary">GUARDAR</button>
                             </div>
                         </div>
