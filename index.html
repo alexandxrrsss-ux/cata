@@ -18,8 +18,8 @@
         .btn-primary { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); transition: all 0.3s ease; }
         input { background: #0a0f1d !important; border: 1px solid rgba(249, 115, 22, 0.3) !important; color: #ffffff !important; outline: none; }
         .notif { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 16px; background: #10b981; color: white; font-weight: 900; z-index: 600; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4); }
-        .loading-overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.9); backdrop-filter: blur(8px); z-index: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .spinner { width: 60px; height: 60px; border: 6px solid rgba(249, 115, 22, 0.1); border-top-color: #f97316; border-radius: 50%; animation: spin 1s linear infinite; }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.85); backdrop-filter: blur(4px); z-index: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(249, 115, 22, 0.1); border-top-color: #f97316; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .btn-x { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; cursor: pointer; border: 1px solid rgba(239, 68, 68, 0.1); }
         .modal-scroll { max-height: 85vh; overflow-y: auto; scrollbar-width: none; }
@@ -36,10 +36,10 @@
         const ADMIN_PASSWORD = "123";
 
         function App() {
-            // 1. MEJORA: Carga desde caché local inmediatamente para que sea rápido
+            // Inicialización con persistencia para evitar la pantalla vacía de tus fotos
             const [data, setData] = useState(() => {
-                const cache = localStorage.getItem('stock_cache');
-                return cache ? JSON.parse(cache) : { herramientas: [], pedidos: [], historial: [] };
+                const saved = localStorage.getItem('master_stock_v52');
+                return saved ? JSON.parse(saved) : { herramientas: [], pedidos: [], historial: [] };
             });
 
             const [seccion, setSeccion] = useState('stock');
@@ -50,12 +50,10 @@
             const [form, setForm] = useState(null);
             const [notif, setNotif] = useState("");
             const [isWorking, setIsWorking] = useState(false);
-            const blockSync = useRef(false);
 
             const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 3000); };
 
-            const sync = useCallback(async (force = false) => {
-                if (blockSync.current && !force) return;
+            const sync = useCallback(async () => {
                 try {
                     const [h, p, hi] = await Promise.all([
                         supabase.from('herramientas').select('*').order('nombre', { ascending: true }),
@@ -63,13 +61,12 @@
                         supabase.from('historial').select('*').order('fecha', { ascending: false }).limit(60)
                     ]);
                     
-                    const result = { herramientas: h.data || [], pedidos: p.data || [], historial: hi.data || [] };
-                    setData(result);
-                    // Guardar en caché para la próxima vez
-                    localStorage.setItem('stock_cache', JSON.stringify(result));
-                } catch (e) {
-                    console.error("Error sync:", e);
-                }
+                    if (h.data) {
+                        const updatedData = { herramientas: h.data, pedidos: p.data || [], historial: hi.data || [] };
+                        setData(updatedData);
+                        localStorage.setItem('master_stock_v52', JSON.stringify(updatedData));
+                    }
+                } catch (e) { console.error("Sync Error:", e); }
             }, []);
 
             useEffect(() => {
@@ -78,9 +75,7 @@
                 return () => supabase.removeChannel(channel);
             }, [sync]);
 
-            const normalizar = (texto) => {
-                return texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            };
+            const normalizar = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
             const despachar = async (p) => {
                 setIsWorking(true);
@@ -89,76 +84,61 @@
                     await supabase.from('historial').insert([{ herramienta_nombre: p.herramienta_nombre, usuario: p.usuario_nombre, cantidad: p.cantidad_pedida, tarea: p.tarea, foto_url: p.foto_url }]);
                     if(h) await supabase.from('herramientas').update({ cantidad: Math.max(0, h.cantidad - p.cantidad_pedida) }).eq('id', h.id);
                     await supabase.from('pedidos').delete().eq('id', p.id);
-                    showMsg("ENTREGADO CON ÉXITO");
-                    await sync(true);
+                    showMsg("ENTREGADO");
+                    await sync();
                 } catch (e) { console.error(e); } finally { setIsWorking(false); }
             };
 
-            const borrarHistorialItem = async (hi) => {
-                if(!confirm("¿BORRAR ESTE REGISTRO?")) return;
+            const enviarPedido = async () => {
+                if(!modalPedido.user_name || !modalPedido.job) return alert("DATOS INCOMPLETOS");
                 setIsWorking(true);
                 try {
-                    await supabase.from('historial').delete().eq('id', hi.id);
-                    showMsg("BORRADO CON ÉXITO");
-                    await sync(true);
-                } catch (e) { console.error(e); } finally { setIsWorking(false); }
+                    const { error } = await supabase.from('pedidos').insert([{ 
+                        herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, 
+                        usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, 
+                        cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url 
+                    }]);
+                    
+                    if (!error) {
+                        showMsg("PEDIDO ENVIADO");
+                        setModalPedido(null);
+                        await sync(); // Refrescar stock para que no se vea vacío
+                    }
+                } catch (e) { console.error(e); } 
+                finally { setIsWorking(false); }
             };
 
             const handleUpload = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => setForm(prev => ({ ...prev, foto_url: event.target.result }));
-                reader.readAsDataURL(file);
                 setIsWorking(true);
                 const name = `${Date.now()}_${file.name}`;
                 const { error } = await supabase.storage.from('fotos').upload(name, file);
                 if (!error) {
                     const { data: { publicUrl } } = supabase.storage.from('fotos').getPublicUrl(name);
                     setForm(prev => ({ ...prev, foto_url: publicUrl }));
-                    showMsg("IMAGEN CARGADA");
+                    showMsg("IMAGEN LISTA");
                 }
                 setIsWorking(false);
-            };
-
-            const enviarPedido = async () => {
-                if(!modalPedido.user_name || !modalPedido.job) return alert("LLENA LOS DATOS");
-                setIsWorking(true);
-                try {
-                    // CORRECCIÓN: Usar await para asegurar que la DB reciba el pedido antes de cerrar el modal
-                    await supabase.from('pedidos').insert([{ 
-                        herramienta_id: modalPedido.id, herramienta_nombre: modalPedido.nombre, 
-                        usuario_nombre: modalPedido.user_name, tarea: modalPedido.job, 
-                        cantidad_pedida: modalPedido.pedido_cant, foto_url: modalPedido.foto_url 
-                    }]);
-                    showMsg("PEDIDO ENVIADO CON ÉXITO");
-                    setModalPedido(null); // Cerramos el modal
-                    await sync(true); // Actualizamos stock inmediatamente
-                } catch (e) { 
-                    console.error(e); 
-                    setIsWorking(false);
-                } finally {
-                    setIsWorking(false);
-                }
             };
 
             return (
                 <div className="min-h-screen pb-20">
                     {isWorking && (
                         <div className="loading-overlay">
-                            <div className="spinner mb-6"></div>
-                            <div className="font-tech text-xs text-orange-500 tracking-[0.4em] uppercase animate-pulse">Procesando...</div>
+                            <div className="spinner mb-4"></div>
+                            <div className="font-tech text-[10px] text-orange-500 tracking-widest animate-pulse">PROCESANDO...</div>
                         </div>
                     )}
 
-                    {notif && <div className="notif font-tech italic text-[10px]">✓ {notif}</div>}
+                    {notif && <div className="notif font-tech text-[10px]">✓ {notif}</div>}
                     
                     <header className="sticky top-0 z-40 p-4 flex flex-col items-center bg-slate-950/90 backdrop-blur-xl border-b border-white/5">
                         <div className="font-tech font-black text-2xl tracking-tighter mb-4 italic text-white uppercase">STOCK<span className="text-orange-500">ELITE</span></div>
-                        <nav className="flex gap-2 p-1.5 bg-black/40 rounded-2xl border border-white/5 overflow-x-auto max-w-full">
-                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase whitespace-nowrap ${seccion === 'stock' ? 'bg-orange-500 text-white' : 'text-slate-400'}`}>STOCK</button>
-                            {isAdmin && <button onClick={() => setSeccion('pedidos')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase whitespace-nowrap ${seccion === 'pedidos' ? 'bg-orange-500 text-white' : 'text-slate-400'}`}>PEDIDOS</button>}
-                            {isAdmin && <button onClick={() => setSeccion('historial')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase whitespace-nowrap ${seccion === 'historial' ? 'bg-orange-500 text-white' : 'text-slate-400'}`}>HISTORIAL</button>}
+                        <nav className="flex gap-2 p-1.5 bg-black/40 rounded-2xl border border-white/5">
+                            <button onClick={() => setSeccion('stock')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'stock' ? 'bg-orange-500 text-white' : 'text-slate-400'}`}>STOCK</button>
+                            {isAdmin && <button onClick={() => setSeccion('pedidos')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'pedidos' ? 'bg-orange-500 text-white' : 'text-slate-400'}`}>PEDIDOS</button>}
+                            {isAdmin && <button onClick={() => setSeccion('historial')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase ${seccion === 'historial' ? 'bg-orange-500 text-white' : 'text-slate-400'}`}>HISTORIAL</button>}
                             <button onClick={() => isAdmin ? setIsAdmin(false) : setMostrarLogin(true)} className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase bg-white/5 text-white">{isAdmin ? 'SALIR' : 'ADMIN'}</button>
                         </nav>
                     </header>
@@ -174,7 +154,7 @@
                                     {data.herramientas.filter(h => normalizar(h.nombre).includes(normalizar(busqueda))).map(h => (
                                         <div key={h.id} className="glass-card rounded-[2rem] p-4 flex flex-col text-white relative">
                                             <div className="w-full h-32 bg-black/40 rounded-[1.5rem] mb-3 flex items-center justify-center overflow-hidden border border-white/5">
-                                                <img src={h.foto_url} className="w-full h-full object-contain p-2" />
+                                                <img src={h.foto_url} className="w-full h-full object-contain p-2" loading="lazy" />
                                             </div>
                                             <h3 className="text-[10px] font-black uppercase text-center min-h-[40px] flex items-center justify-center mb-2 px-1 break-words leading-tight">{h.nombre}</h3>
                                             <div className="flex justify-between items-center mb-4 px-2">
@@ -196,12 +176,11 @@
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {data.pedidos.map(p => (
                                     <div key={p.id} className="glass-card p-5 rounded-[2.5rem] flex items-center gap-5 border-l-[6px] border-orange-600 text-white relative">
-                                        <button onClick={async() => { if(confirm("¿CANCELAR?")) { await supabase.from('pedidos').delete().eq('id', p.id); sync(true); } }} className="btn-x text-[10px]">✕</button>
+                                        <button onClick={async() => { if(confirm("¿CANCELAR?")) { await supabase.from('pedidos').delete().eq('id', p.id); sync(); } }} className="btn-x text-[10px]">✕</button>
                                         <img src={p.foto_url} className="w-20 h-20 object-contain bg-black/40 rounded-2xl p-2 border border-white/5" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-black text-orange-500 text-xs uppercase mb-1 leading-tight">{p.herramienta_nombre}</p>
                                             <p className="text-[10px] font-bold opacity-60 uppercase">{p.usuario_nombre} • {p.tarea}</p>
-                                            <p className="text-[9px] font-tech text-slate-400 uppercase mt-1">UBICACIÓN: {data.herramientas.find(h=>h.id===p.herramienta_id)?.lugar || 'S/N'}</p>
                                             <div className="font-tech text-3xl mt-1 tracking-tighter">{p.cantidad_pedida} PZ</div>
                                         </div>
                                         <button onClick={() => despachar(p)} className="bg-emerald-600 px-7 py-5 rounded-[1.5rem] font-black text-[11px] uppercase shadow-lg">OK</button>
@@ -219,10 +198,8 @@
                                             <p className="font-black text-[11px] uppercase text-orange-500/80 leading-tight">{hi.herramienta_nombre}</p>
                                             <p className="text-slate-400 text-[9px] font-bold uppercase">{hi.usuario} • {hi.tarea}</p>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="font-tech text-xl">-{hi.cantidad}</div>
-                                            <button onClick={() => borrarHistorialItem(hi)} className="bg-red-600/20 text-red-500 p-2 rounded-lg text-xs">🗑</button>
-                                        </div>
+                                        <div className="font-tech text-xl">-{hi.cantidad}</div>
+                                        {isAdmin && <button onClick={async() => {if(confirm("¿BORRAR?")){await supabase.from('historial').delete().eq('id',hi.id); sync();}}} className="text-red-500 ml-4">🗑</button>}
                                     </div>
                                 ))}
                             </div>
@@ -233,20 +210,16 @@
                         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-xl">
                             <div className="glass-card p-6 rounded-[3rem] w-full max-w-sm relative text-center border-orange-500/30 border-2 modal-scroll">
                                 <div className="btn-x" onClick={() => setModalPedido(null)}>✕</div>
-                                <div className="w-28 h-28 bg-black/40 mx-auto mb-4 rounded-[2rem] p-3 border border-white/10">
-                                    <img src={modalPedido.foto_url} className="w-full h-full object-contain" />
-                                </div>
-                                <h2 className="font-tech text-orange-500 text-[10px] mb-4 uppercase font-black px-2 leading-tight">{modalPedido.nombre}</h2>
-                                <div className="space-y-3 mb-5">
-                                    <input type="text" placeholder="TU NOMBRE" className="w-full p-4 rounded-2xl text-center text-[11px] font-black uppercase" value={modalPedido.user_name} onChange={e => setModalPedido({...modalPedido, user_name: e.target.value.toUpperCase()})} />
-                                    <input type="text" placeholder="ACTIVIDAD" className="w-full p-4 rounded-2xl text-center text-[11px] font-black uppercase" value={modalPedido.job} onChange={e => setModalPedido({...modalPedido, job: e.target.value.toUpperCase()})} />
-                                </div>
+                                <img src={modalPedido.foto_url} className="w-28 h-28 mx-auto mb-4 object-contain bg-black/40 rounded-[2rem] p-3" />
+                                <h2 className="font-tech text-orange-500 text-[10px] mb-4 uppercase font-black">{modalPedido.nombre}</h2>
+                                <input type="text" placeholder="TU NOMBRE" className="w-full p-4 mb-3 rounded-2xl text-center text-[11px] font-black uppercase" value={modalPedido.user_name} onChange={e => setModalPedido({...modalPedido, user_name: e.target.value.toUpperCase()})} />
+                                <input type="text" placeholder="ACTIVIDAD" className="w-full p-4 mb-5 rounded-2xl text-center text-[11px] font-black uppercase" value={modalPedido.job} onChange={e => setModalPedido({...modalPedido, job: e.target.value.toUpperCase()})} />
                                 <div className="flex items-center justify-between bg-black/50 p-2 rounded-2xl mb-6">
-                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-12 h-12 bg-white/5 rounded-xl text-xl font-black text-orange-500">-</button>
-                                    <div className="font-tech text-3xl font-black text-white">{modalPedido.pedido_cant}</div>
-                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-12 h-12 bg-white/5 rounded-xl text-xl font-black text-orange-500">+</button>
+                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.max(1, modalPedido.pedido_cant - 1)})} className="w-12 h-12 text-orange-500 font-bold text-xl">-</button>
+                                    <div className="font-tech text-2xl">{modalPedido.pedido_cant}</div>
+                                    <button onClick={() => setModalPedido({...modalPedido, pedido_cant: Math.min(modalPedido.cantidad, modalPedido.pedido_cant + 1)})} className="w-12 h-12 text-orange-500 font-bold text-xl">+</button>
                                 </div>
-                                <button onClick={enviarPedido} className="w-full py-5 rounded-[1.5rem] font-black text-[11px] btn-primary text-white">CONFIRMAR PEDIDO</button>
+                                <button onClick={enviarPedido} className="w-full py-5 rounded-[1.5rem] font-black text-[11px] btn-primary">CONFIRMAR PEDIDO</button>
                             </div>
                         </div>
                     )}
@@ -255,35 +228,33 @@
                         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-xl">
                             <div className="glass-card p-8 rounded-[3rem] w-full max-w-sm relative border border-white/10 modal-scroll">
                                 <div className="btn-x" onClick={() => setForm(null)}>✕</div>
-                                <div className="w-36 h-36 bg-black/60 mx-auto mb-6 rounded-[2.5rem] overflow-hidden relative group border border-white/10">
+                                <div className="w-32 h-32 mx-auto mb-6 bg-black/60 rounded-[2rem] overflow-hidden relative group">
                                     <img src={form.foto_url || 'https://via.placeholder.com/150'} className="w-full h-full object-contain p-3" />
-                                    <label className="absolute inset-0 bg-orange-600/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer text-[10px] font-black">
-                                        <span className="text-xl">📷</span> SUBIR <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+                                    <label className="absolute inset-0 bg-orange-600/80 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer text-[10px] font-black">
+                                        SUBIR FOTO <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
                                     </label>
                                 </div>
-                                <div className="space-y-3 mb-6">
-                                    <input type="text" placeholder="NOMBRE" className="w-full p-4 rounded-2xl text-[10px] font-black uppercase" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input type="number" placeholder="STOCK" className="w-full p-4 rounded-2xl text-[12px] font-black text-center" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
-                                        <input type="text" placeholder="LUGAR" className="w-full p-4 rounded-2xl text-[10px] font-black uppercase text-center" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value.toUpperCase()})} />
-                                    </div>
+                                <input type="text" placeholder="NOMBRE" className="w-full p-4 mb-3 rounded-2xl text-[10px] font-black uppercase" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value.toUpperCase()})} />
+                                <div className="grid grid-cols-2 gap-3 mb-6">
+                                    <input type="number" placeholder="STOCK" className="w-full p-4 rounded-2xl text-center font-black" value={form.cantidad} onChange={e => setForm({...form, cantidad: parseInt(e.target.value) || 0})} />
+                                    <input type="text" placeholder="LUGAR" className="w-full p-4 rounded-2xl text-center font-black uppercase" value={form.lugar} onChange={e => setForm({...form, lugar: e.target.value.toUpperCase()})} />
                                 </div>
                                 <button onClick={async () => {
-                                    if(!form.nombre) return alert("FALTA NOMBRE");
                                     setIsWorking(true);
                                     if(form.id) await supabase.from('herramientas').update({...form}).eq('id', form.id);
                                     else await supabase.from('herramientas').insert([{...form}]);
-                                    setForm(null); setIsWorking(false); showMsg("GUARDADO CORRECTO"); sync(true);
+                                    setForm(null); await sync(); setIsWorking(false); showMsg("GUARDADO");
                                 }} className="w-full py-5 rounded-[1.5rem] font-black text-[11px] btn-primary">GUARDAR</button>
+                                {form.id && <button onClick={async() => {if(confirm("¿ELIMINAR?")){await supabase.from('herramientas').delete().eq('id',form.id); setForm(null); sync();}}} className="w-full mt-3 text-red-500 text-[10px] font-black">ELIMINAR PRODUCTO</button>}
                             </div>
                         </div>
                     )}
 
                     {mostrarLogin && (
                         <div className="fixed inset-0 z-[110] bg-black/98 flex items-center justify-center p-6">
-                            <div className="glass-card p-10 rounded-[4rem] w-full max-w-[280px] text-center relative border border-white/5">
+                            <div className="glass-card p-10 rounded-[4rem] w-full max-w-[280px] text-center relative">
                                 <div className="btn-x" onClick={() => setMostrarLogin(false)}>✕</div>
-                                <input type="password" placeholder="••••" className="w-full p-6 rounded-3xl text-center text-5xl font-tech text-orange-500 bg-transparent border-none" autoFocus 
+                                <input type="password" placeholder="••••" className="w-full p-6 rounded-3xl text-center text-5xl font-tech text-orange-500 bg-transparent" autoFocus 
                                     onChange={e => e.target.value === ADMIN_PASSWORD && (setIsAdmin(true), setMostrarLogin(false), showMsg("ACCESO OK"))} />
                             </div>
                         </div>
