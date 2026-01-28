@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StockMaster Elite v53.0</title>
+    <title>StockMaster Elite v54.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -49,7 +49,7 @@
             const showMsg = (txt) => { setNotif(txt); setTimeout(() => setNotif(""), 3000); };
 
             const sync = useCallback(async () => {
-                // No bloqueamos la UI aquí para evitar el efecto de "borrado"
+                // Obtenemos datos sin limpiar el estado anterior para evitar pantalla vacía
                 const [h, p, hi] = await Promise.all([
                     supabase.from('herramientas').select('*').order('nombre', { ascending: true }),
                     supabase.from('pedidos').select('*').order('created_at', { ascending: false }),
@@ -57,11 +57,11 @@
                 ]);
                 
                 if (h.data) {
-                    setData(prev => ({
+                    setData({
                         herramientas: h.data,
                         pedidos: p.data || [],
                         historial: hi.data || []
-                    }));
+                    });
                 }
             }, []);
 
@@ -81,6 +81,16 @@
                     if(h) await supabase.from('herramientas').update({ cantidad: Math.max(0, h.cantidad - p.cantidad_pedida) }).eq('id', h.id);
                     await supabase.from('pedidos').delete().eq('id', p.id);
                     showMsg("ENTREGADO CON ÉXITO");
+                    await sync();
+                } catch (e) { console.error(e); } finally { setIsWorking(false); }
+            };
+
+            const cancelarPedido = async (id) => {
+                if(!confirm("¿BORRAR ESTE PEDIDO PENDIENTE?")) return;
+                setIsWorking(true); // Bloqueo de "Procesando"
+                try {
+                    await supabase.from('pedidos').delete().eq('id', id);
+                    showMsg("PEDIDO BORRADO");
                     await sync();
                 } catch (e) { console.error(e); } finally { setIsWorking(false); }
             };
@@ -178,7 +188,7 @@
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {data.pedidos.map(p => (
                                     <div key={p.id} className="glass-card p-5 rounded-[2.5rem] flex items-center gap-5 border-l-[6px] border-orange-600 text-white relative">
-                                        <button onClick={async() => { if(confirm("¿CANCELAR?")) { await supabase.from('pedidos').delete().eq('id', p.id); sync(); } }} className="btn-x text-[10px]">✕</button>
+                                        <button onClick={() => cancelarPedido(p.id)} className="btn-x text-[10px]">✕</button>
                                         <img src={p.foto_url} className="w-20 h-20 object-contain bg-black/40 rounded-2xl p-2 border border-white/5" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-black text-orange-500 text-xs uppercase mb-1 leading-tight">{p.herramienta_nombre}</p>
