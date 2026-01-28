@@ -3,656 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>⚡ StockMaster Turbo</title>
-    
-    <!-- SOLO LO ESENCIAL -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>STOCK TURBO V3</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
-    <!-- ESTILOS INLINE PARA CARGA INSTANTÁNEA -->
     <style>
-        /* CSS CRÍTICO - Carga en 1ms */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            background: #0f172a; 
-            color: #f1f5f9; 
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-            overflow-x: hidden;
-        }
-        
-        /* Skeleton loading ULTRA RÁPIDO */
-        .skeleton-turbo {
-            background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
-            background-size: 400% 100%;
-            animation: skeleton-pulse 1s ease-in-out infinite;
-        }
-        @keyframes skeleton-pulse {
-            0% { background-position: -400% 0; }
-            100% { background-position: 400% 0; }
-        }
-        
-        /* Imágenes que cargan INSTANTÁNEAMENTE */
-        .img-turbo {
-            opacity: 0;
-            transition: opacity 0.05s linear !important; /* 20x más rápido */
-        }
-        .img-turbo.loaded {
-            opacity: 1;
-        }
-        
-        /* Loading bar que se mueve en 0.1s */
-        .loading-turbo {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #f97316, #ea580c);
-            z-index: 9999;
-            transition: width 0.1s linear;
-            box-shadow: 0 0 10px #f97316;
-        }
-        
-        /* Cards optimizadas para GPU */
-        .card-gpu {
-            transform: translateZ(0);
-            backface-visibility: hidden;
-            will-change: transform;
-        }
-        
-        /* Scroll sin delay */
-        .scroll-fast {
-            -webkit-overflow-scrolling: touch;
-            scroll-behavior: auto;
-        }
-        
-        /* Botones con respuesta inmediata */
-        .btn-turbo {
-            transform: translateZ(0);
-            transition: transform 0.05s ease-out;
-        }
-        .btn-turbo:active {
-            transform: scale(0.95);
-        }
-        
-        /* Ocultar scrollbar pero mantener scroll */
-        .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        
-        /* Prevenir layout shifts */
-        .img-container {
-            position: relative;
-            width: 100%;
-            height: 7rem;
-            overflow: hidden;
-        }
+        :root { --orange: #f97316; --bg: #020617; --card: #0f172a; }
+        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; -webkit-tap-highlight-color: transparent; }
+        header { sticky top: 0; background: rgba(2,6,23,0.9); backdrop-filter: blur(10px); padding: 15px; border-bottom: 1px solid #1e293b; position: sticky; top: 0; z-index: 100; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+        .card { background: var(--card); border-radius: 15px; padding: 10px; border: 1px solid #1e293b; display: flex; flex-direction: column; }
+        .img-box { width: 100%; aspect-ratio: 1/1; background: #000; border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+        img { width: 100%; height: 100%; object-fit: contain; }
+        input { width: 100%; box-sizing: border-box; padding: 12px; background: #1e293b; border: 1px solid #334155; border-radius: 10px; color: white; margin-bottom: 10px; }
+        .btn { background: var(--orange); color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; }
+        .btn:active { transform: scale(0.95); opacity: 0.8; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .badge { background: rgba(249,115,22,0.1); color: var(--orange); padding: 2px 8px; border-radius: 5px; font-size: 12px; font-weight: bold; }
+        #loading-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--orange); width: 0%; transition: width 0.3s; z-index: 2000; }
+        .skeleton { animation: pulse 1.5s infinite; background: #1e293b; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
     </style>
 </head>
 <body>
-    <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useCallback, useMemo, useRef, memo } = React;
-        
-        // Config Supabase
-        const supabase = window.supabase.createClient(
-            'https://sqpeakmzunusclzskngr.supabase.co',
-            'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'
-        );
-        
-        const ADMIN_PIN = "123";
+<div id="loading-bar"></div>
 
-        // ==================== COMPONENTE IMAGEN MEGA RÁPIDA ====================
-        const TurboImage = memo(({ src, alt, className = '' }) => {
-            const [loaded, setLoaded] = useState(false);
-            const imgRef = useRef(null);
-            
-            useEffect(() => {
-                if (!src) return;
-                
-                const img = new Image();
-                img.src = src;
-                
-                img.onload = () => {
-                    setLoaded(true);
-                    if (imgRef.current) {
-                        imgRef.current.src = src;
-                    }
-                };
-                
-                // Precargar en background
-                return () => {
-                    img.onload = null;
-                };
-            }, [src]);
-            
-            return (
-                <div className={`img-container ${className}`}>
-                    {/* Skeleton instantáneo */}
-                    {!loaded && (
-                        <div className="absolute inset-0 skeleton-turbo rounded-lg"></div>
-                    )}
-                    
-                    {/* Imagen real */}
-                    <img
-                        ref={imgRef}
-                        alt={alt || ''}
-                        className={`w-full h-full object-cover img-turbo ${loaded ? 'loaded' : ''}`}
-                        loading="lazy"
-                        decoding="async"
-                        onLoad={() => setLoaded(true)}
-                    />
-                </div>
-            );
-        });
+<header>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="margin: 0; font-size: 20px;">STOCK<span style="color:var(--orange)">TURBO</span></h1>
+        <button onclick="toggleAdmin()" id="admin-btn" style="background:none; border: 1px solid #334155; color: #94a3b8; padding: 5px 10px; border-radius: 5px; font-size: 10px;">ADMIN</button>
+    </div>
+    <div style="margin-top: 15px; display: flex; gap: 5px;">
+        <input type="text" id="search" placeholder="Buscar herramienta..." oninput="render()" style="margin: 0;">
+    </div>
+</header>
 
-        // ==================== COMPONENTE PRINCIPAL ====================
-        function App() {
-            // ==================== ESTADOS OPTIMIZADOS ====================
-            const [data, setData] = useState(() => {
-                try {
-                    const cache = localStorage.getItem('stock_turbo_cache');
-                    return cache ? JSON.parse(cache) : { herramientas: [], pedidos: [] };
-                } catch {
-                    return { herramientas: [], pedidos: [] };
-                }
-            });
-            
-            const [seccion, setSeccion] = useState('stock');
-            const [busqueda, setBusqueda] = useState('');
-            const [isAdmin, setIsAdmin] = useState(false);
-            const [modalPedido, setModalPedido] = useState(null);
-            const [isWorking, setIsWorking] = useState(false);
-            const [loadProgress, setLoadProgress] = useState(0);
-            
-            // Debounce para búsqueda
-            const [searchInput, setSearchInput] = useState('');
-            const searchTimeout = useRef(null);
-            
-            // Cache para imágenes
-            const imageCache = useRef(new Map());
-            
-            // ==================== FUNCIONES ULTRA RÁPIDAS ====================
-            
-            // Sincronización inteligente
-            const sync = useCallback(async (force = false) => {
-                try {
-                    setLoadProgress(30);
-                    
-                    // Usar cache si es reciente (2 minutos)
-                    const lastSync = localStorage.getItem('stock_last_sync');
-                    const now = Date.now();
-                    const CACHE_TIME = 2 * 60 * 1000;
-                    
-                    if (!force && lastSync && (now - parseInt(lastSync)) < CACHE_TIME) {
-                        setLoadProgress(100);
-                        setTimeout(() => setLoadProgress(0), 100);
-                        return;
-                    }
-                    
-                    const [tools] = await Promise.all([
-                        supabase.from('herramientas').select('*').order('nombre')
-                    ]);
-                    
-                    if (tools.data) {
-                        const newData = {
-                            herramientas: tools.data,
-                            pedidos: data.pedidos || []
-                        };
-                        
-                        setData(newData);
-                        localStorage.setItem('stock_turbo_cache', JSON.stringify(newData));
-                        localStorage.setItem('stock_last_sync', Date.now().toString());
-                        
-                        // Precargar imágenes de primeras 5 herramientas
-                        tools.data.slice(0, 5).forEach(tool => {
-                            if (tool.foto_url && !imageCache.current.has(tool.foto_url)) {
-                                const img = new Image();
-                                img.src = tool.foto_url;
-                                imageCache.current.set(tool.foto_url, true);
-                            }
-                        });
-                    }
-                    
-                    setLoadProgress(100);
-                    setTimeout(() => setLoadProgress(0), 100);
-                    
-                } catch (error) {
-                    console.error('Sync error:', error);
-                    setLoadProgress(0);
-                }
-            }, [data.pedidos]);
-            
-            // WebSocket optimizado
-            useEffect(() => {
-                sync();
-                
-                const channel = supabase
-                    .channel('tools_updates')
-                    .on('postgres_changes', 
-                        { event: '*', schema: 'public', table: 'herramientas' }, 
-                        (payload) => {
-                            setData(prev => ({
-                                ...prev,
-                                herramientas: prev.herramientas.map(t => 
-                                    t.id === payload.new.id ? payload.new : t
-                                )
-                            }));
-                        }
-                    )
-                    .subscribe();
-                
-                return () => supabase.removeChannel(channel);
-            }, [sync]);
-            
-            // Búsqueda con debounce
-            useEffect(() => {
-                if (searchTimeout.current) {
-                    clearTimeout(searchTimeout.current);
-                }
-                
-                searchTimeout.current = setTimeout(() => {
-                    setBusqueda(searchInput);
-                }, 150); // 150ms debounce
-                
-                return () => {
-                    if (searchTimeout.current) {
-                        clearTimeout(searchTimeout.current);
-                    }
-                };
-            }, [searchInput]);
-            
-            // Filtrado ultra rápido
-            const herramientasFiltradas = useMemo(() => {
-                if (!busqueda.trim()) return data.herramientas;
-                
-                const term = busqueda.toLowerCase();
-                return data.herramientas.filter(h =>
-                    h.nombre.toLowerCase().includes(term) ||
-                    (h.lugar && h.lugar.toLowerCase().includes(term))
-                );
-            }, [data.herramientas, busqueda]);
-            
-            // Función de acción rápida
-            const ejecutarRapido = useCallback(async (accion) => {
-                setIsWorking(true);
-                try {
-                    await accion();
-                    await sync(true);
-                } catch (error) {
-                    console.error('Error:', error);
-                } finally {
-                    setIsWorking(false);
-                }
-            }, [sync]);
-            
-            // Despachar pedido
-            const despacharPedido = useCallback((pedido) => {
-                ejecutarRapido(async () => {
-                    const herramienta = data.herramientas.find(h => h.id === pedido.herramienta_id);
-                    
-                    if (herramienta) {
-                        await supabase.from('herramientas').update({
-                            cantidad: Math.max(0, herramienta.cantidad - pedido.cantidad_pedida)
-                        }).eq('id', herramienta.id);
-                    }
-                    
-                    await supabase.from('pedidos').delete().eq('id', pedido.id);
-                    
-                    // Actualizar localmente al instante
-                    setData(prev => ({
-                        ...prev,
-                        pedidos: prev.pedidos.filter(p => p.id !== pedido.id)
-                    }));
-                });
-            }, [data.herramientas, ejecutarRapido]);
-            
-            // Enviar pedido
-            const enviarPedido = useCallback(() => {
-                if (!modalPedido.user_name || !modalPedido.job) return;
-                
-                ejecutarRapido(async () => {
-                    const nuevoPedido = {
-                        herramienta_id: modalPedido.id,
-                        herramienta_nombre: modalPedido.nombre,
-                        usuario_nombre: modalPedido.user_name.toUpperCase(),
-                        tarea: modalPedido.job.toUpperCase(),
-                        cantidad_pedida: modalPedido.pedido_cant,
-                        foto_url: modalPedido.foto_url,
-                        created_at: new Date().toISOString()
-                    };
-                    
-                    const { data: result } = await supabase
-                        .from('pedidos')
-                        .insert([nuevoPedido])
-                        .select()
-                        .single();
-                    
-                    if (result) {
-                        setData(prev => ({
-                            ...prev,
-                            pedidos: [result, ...prev.pedidos]
-                        }));
-                    }
-                    
-                    setModalPedido(null);
-                });
-            }, [modalPedido, ejecutarRapido]);
-            
-            // ==================== RENDER MEGA RÁPIDO ====================
-            return (
-                <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
-                    {/* Loading bar ultrarrápida */}
-                    <div className="loading-turbo" style={{ width: `${loadProgress}%` }}></div>
-                    
-                    {/* Overlay de carga */}
-                    {isWorking && (
-                        <div className="fixed inset-0 z-[9998] bg-black/80 flex items-center justify-center">
-                            <div className="text-center">
-                                <div className="w-12 h-12 border-3 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                                <p className="mt-3 text-orange-400 text-sm font-bold">PROCESANDO...</p>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* HEADER */}
-                    <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 p-3">
-                        <div className="flex flex-col items-center">
-                            <h1 className="text-2xl font-bold text-white mb-3">
-                                STOCK<span className="text-orange-500">TURBO</span>
-                            </h1>
-                            
-                            <div className="flex gap-2 w-full max-w-md overflow-x-auto hide-scrollbar">
-                                <button 
-                                    onClick={() => setSeccion('stock')}
-                                    className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition-all ${
-                                        seccion === 'stock' 
-                                            ? 'bg-orange-500 text-white shadow-lg' 
-                                            : 'bg-slate-800 text-slate-400 hover:text-white'
-                                    }`}
-                                >
-                                    📦 STOCK
-                                </button>
-                                
-                                {isAdmin && (
-                                    <button 
-                                        onClick={() => setSeccion('pedidos')}
-                                        className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition-all ${
-                                            seccion === 'pedidos' 
-                                                ? 'bg-orange-500 text-white shadow-lg' 
-                                                : 'bg-slate-800 text-slate-400 hover:text-white'
-                                        }`}
-                                    >
-                                        📋 PEDIDOS
-                                    </button>
-                                )}
-                                
-                                <button 
-                                    onClick={() => isAdmin ? setIsAdmin(false) : setIsAdmin(true)}
-                                    className="flex-1 py-2 px-4 rounded-lg text-xs font-bold bg-slate-800 text-white hover:bg-slate-700 transition-all"
-                                >
-                                    {isAdmin ? '👤 SALIR' : '🔐 ADMIN'}
-                                </button>
-                            </div>
-                        </div>
-                    </header>
-                    
-                    {/* CONTENIDO PRINCIPAL */}
-                    <main className="p-4">
-                        {seccion === 'stock' ? (
-                            <>
-                                {/* BUSCADOR */}
-                                <div className="mb-6">
-                                    <input 
-                                        type="text"
-                                        placeholder="🔍 BUSCAR HERRAMIENTA..."
-                                        value={searchInput}
-                                        onChange={(e) => setSearchInput(e.target.value)}
-                                        className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-all"
-                                    />
-                                </div>
-                                
-                                {/* CONTADOR */}
-                                <div className="text-xs text-slate-400 mb-4">
-                                    {herramientasFiltradas.length} herramientas
-                                    {busqueda && ` para "${busqueda}"`}
-                                </div>
-                                
-                                {/* GRILLA DE HERRAMIENTAS */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                    {herramientasFiltradas.map((herramienta, index) => (
-                                        <div 
-                                            key={`${herramienta.id}-${index}`}
-                                            className="card-gpu bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 hover:border-orange-500/30 transition-all duration-150"
-                                        >
-                                            {/* Imagen */}
-                                            <div className="mb-2">
-                                                <TurboImage 
-                                                    src={herramienta.foto_url} 
-                                                    alt={herramienta.nombre}
-                                                    className="rounded-lg"
-                                                />
-                                            </div>
-                                            
-                                            {/* Nombre */}
-                                            <h3 className="text-xs font-bold uppercase text-center h-10 flex items-center justify-center mb-2 line-clamp-2">
-                                                {herramienta.nombre}
-                                            </h3>
-                                            
-                                            {/* Info */}
-                                            <div className="flex justify-between items-center mb-3">
-                                                <span className="text-[10px] text-slate-400 uppercase truncate max-w-[60%]">
-                                                    {herramienta.lugar || 'SIN UBICACIÓN'}
-                                                </span>
-                                                <span className="font-bold text-xs text-orange-500 bg-orange-500/10 px-2 py-1 rounded-full">
-                                                    {herramienta.cantidad} PZ
-                                                </span>
-                                            </div>
-                                            
-                                            {/* Botón */}
-                                            <button
-                                                onClick={() => {
-                                                    if (isAdmin) {
-                                                        // TODO: Edición
-                                                        console.log('Editar:', herramienta);
-                                                    } else {
-                                                        setModalPedido({
-                                                            ...herramienta,
-                                                            user_name: '',
-                                                            job: '',
-                                                            pedido_cant: 1
-                                                        });
-                                                    }
-                                                }}
-                                                disabled={herramienta.cantidad <= 0 && !isAdmin}
-                                                className={`btn-turbo w-full py-2.5 rounded-lg text-xs font-bold text-white ${
-                                                    herramienta.cantidad <= 0 && !isAdmin
-                                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                                                        : 'bg-orange-500 hover:bg-orange-600'
-                                                }`}
-                                            >
-                                                {isAdmin ? 'EDITAR' : (herramienta.cantidad <= 0 ? 'AGOTADO' : 'PEDIR')}
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                                
-                                {/* Sin resultados */}
-                                {herramientasFiltradas.length === 0 && (
-                                    <div className="text-center py-10">
-                                        <div className="text-4xl mb-3">🔍</div>
-                                        <p className="text-slate-400">No se encontraron herramientas</p>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            /* SECCIÓN PEDIDOS */
-                            <div className="space-y-3">
-                                {data.pedidos && data.pedidos.length > 0 ? (
-                                    data.pedidos.map(pedido => (
-                                        <div 
-                                            key={pedido.id}
-                                            className="bg-slate-800/50 rounded-xl p-4 flex items-center gap-4 border border-slate-700/50"
-                                        >
-                                            <div className="w-16 h-16 flex-shrink-0">
-                                                <TurboImage 
-                                                    src={pedido.foto_url} 
-                                                    alt={pedido.herramienta_nombre}
-                                                    className="rounded-lg"
-                                                />
-                                            </div>
-                                            
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-bold text-orange-500 text-sm truncate">
-                                                    {pedido.herramienta_nombre}
-                                                </p>
-                                                <p className="text-xs text-slate-400 truncate">
-                                                    👤 {pedido.usuario_nombre} • 📝 {pedido.tarea}
-                                                </p>
-                                                <p className="font-bold text-lg mt-1">{pedido.cantidad_pedida} PZ</p>
-                                            </div>
-                                            
-                                            <button 
-                                                onClick={() => despacharPedido(pedido)}
-                                                className="bg-green-600 hover:bg-green-700 px-4 py-3 rounded-lg font-bold text-white text-sm transition-all active:scale-95 flex-shrink-0"
-                                            >
-                                                ✅ OK
-                                            </button>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="text-center py-10">
-                                        <div className="text-4xl mb-3">📭</div>
-                                        <p className="text-slate-400">No hay pedidos pendientes</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </main>
-                    
-                    {/* MODAL DE PEDIDO */}
-                    {modalPedido && (
-                        <div className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4">
-                            <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-sm border border-slate-700">
-                                <h2 className="font-bold text-orange-500 text-center mb-4 text-sm uppercase">
-                                    {modalPedido.nombre}
-                                </h2>
-                                
-                                <div className="space-y-3">
-                                    <input 
-                                        type="text"
-                                        placeholder="👤 TU NOMBRE"
-                                        value={modalPedido.user_name}
-                                        onChange={(e) => setModalPedido(prev => ({
-                                            ...prev,
-                                            user_name: e.target.value.toUpperCase()
-                                        }))}
-                                        className="w-full p-3 rounded-lg bg-slate-700 border border-slate-600 text-white text-center placeholder-slate-500 focus:outline-none focus:border-orange-500"
-                                        autoFocus
-                                    />
-                                    
-                                    <input 
-                                        type="text"
-                                        placeholder="🔧 ACTIVIDAD"
-                                        value={modalPedido.job}
-                                        onChange={(e) => setModalPedido(prev => ({
-                                            ...prev,
-                                            job: e.target.value.toUpperCase()
-                                        }))}
-                                        className="w-full p-3 rounded-lg bg-slate-700 border border-slate-600 text-white text-center placeholder-slate-500 focus:outline-none focus:border-orange-500"
-                                    />
-                                    
-                                    {/* Selector cantidad */}
-                                    <div className="bg-slate-700/50 p-3 rounded-lg">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-slate-400 text-xs">CANTIDAD:</span>
-                                            <span className="font-bold text-white">{modalPedido.pedido_cant}</span>
-                                        </div>
-                                        
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => setModalPedido(prev => ({
-                                                    ...prev,
-                                                    pedido_cant: Math.max(1, prev.pedido_cant - 1)
-                                                }))}
-                                                className="flex-1 py-2 bg-slate-600 rounded-lg text-white font-bold hover:bg-slate-500"
-                                            >
-                                                -
-                                            </button>
-                                            
-                                            <div className="flex-1 py-2 text-center">
-                                                <span className="text-white font-bold">{modalPedido.pedido_cant}</span>
-                                            </div>
-                                            
-                                            <button
-                                                onClick={() => setModalPedido(prev => ({
-                                                    ...prev,
-                                                    pedido_cant: Math.min(prev.cantidad, prev.pedido_cant + 1)
-                                                }))}
-                                                className="flex-1 py-2 bg-slate-600 rounded-lg text-white font-bold hover:bg-slate-500"
-                                            >
-                                                +
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Botones */}
-                                    <div className="flex gap-2 pt-2">
-                                        <button
-                                            onClick={enviarPedido}
-                                            disabled={!modalPedido.user_name || !modalPedido.job}
-                                            className={`flex-1 py-3 rounded-lg font-bold text-white text-sm ${
-                                                !modalPedido.user_name || !modalPedido.job
-                                                    ? 'bg-slate-700 cursor-not-allowed'
-                                                    : 'bg-orange-500 hover:bg-orange-600'
-                                            }`}
-                                        >
-                                            ✅ CONFIRMAR
-                                        </button>
-                                    </div>
-                                    
-                                    <button
-                                        onClick={() => setModalPedido(null)}
-                                        className="w-full py-2 text-slate-400 text-xs hover:text-white"
-                                    >
-                                        Cancelar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* LOGIN ADMIN */}
-                    {!isAdmin && (
-                        <div className="fixed inset-0 z-[10000] bg-black flex items-center justify-center p-4">
-                            <div className="w-full max-w-xs">
-                                <input
-                                    type="password"
-                                    placeholder="🔐 PIN DE ADMIN"
-                                    className="w-full p-4 bg-transparent text-center text-2xl font-bold text-orange-500 border-none outline-none placeholder-orange-500/50"
-                                    autoFocus
-                                    onChange={(e) => {
-                                        if (e.target.value === ADMIN_PIN) {
-                                            setIsAdmin(true);
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
+<div id="app" class="grid">
+    </div>
+
+<div id="modal" class="modal">
+    <div style="background: var(--card); padding: 25px; border-radius: 20px; width: 100%; max-width: 300px; text-align: center;">
+        <h2 id="modal-title" style="margin-top: 0; color: var(--orange); font-size: 16px;"></h2>
+        <input type="text" id="user-name" placeholder="TU NOMBRE">
+        <input type="text" id="user-task" placeholder="ACTIVIDAD">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0; background: #000; padding: 10px; border-radius: 10px;">
+            <button onclick="changeCant(-1)" style="background:none; border:none; color:var(--orange); font-size: 24px;">-</button>
+            <span id="modal-cant" style="font-size: 24px; font-weight: bold;">1</span>
+            <button onclick="changeCant(1)" style="background:none; border:none; color:var(--orange); font-size: 24px;">+</button>
+        </div>
+        <button class="btn" onclick="confirmarPedido()">CONFIRMAR</button>
+        <button onclick="closeModal()" style="background:none; border:none; color:#64748b; margin-top: 15px; font-size: 12px;">CANCELAR</button>
+    </div>
+</div>
+
+<script>
+    const SB_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
+    const SB_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW';
+    const supabase = window.supabase.createClient(SB_URL, SB_KEY);
+
+    let tools = JSON.parse(localStorage.getItem('cache_tools')) || [];
+    let isAdmin = false;
+    let currentTool = null;
+    let currentCant = 1;
+
+    // Sincronizar datos
+    async function sync() {
+        document.getElementById('loading-bar').style.width = '30%';
+        const { data, error } = await supabase.from('herramientas').select('*').order('nombre');
+        if (!error) {
+            tools = data;
+            localStorage.setItem('cache_tools', JSON.stringify(tools));
+            render();
         }
+        document.getElementById('loading-bar').style.width = '100%';
+        setTimeout(() => document.getElementById('loading-bar').style.width = '0%', 500);
+    }
+
+    function render() {
+        const query = document.getElementById('search').value.toLowerCase();
+        const container = document.getElementById('app');
+        container.innerHTML = '';
+
+        const filtered = tools.filter(t => t.nombre.toLowerCase().includes(query));
+
+        filtered.forEach(t => {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+                <div class="img-box">
+                    <img src="${t.foto_url}" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=SIN+FOTO'">
+                </div>
+                <div style="font-size: 11px; font-weight: bold; height: 30px; overflow: hidden; text-transform: uppercase;">${t.nombre}</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+                    <span style="font-size: 9px; color: #64748b;">${t.lugar || 'BODEGA'}</span>
+                    <span class="badge">${t.cantidad} PZ</span>
+                </div>
+                <button class="btn" onclick="openModal(${t.id})" ${t.cantidad <= 0 ? 'disabled style="background:#1e293b; color:#475569"' : ''}>
+                    ${t.cantidad <= 0 ? 'AGOTADO' : 'PEDIR'}
+                </button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function openModal(id) {
+        currentTool = tools.find(t => t.id === id);
+        currentCant = 1;
+        document.getElementById('modal-title').innerText = currentTool.nombre;
+        document.getElementById('modal-cant').innerText = currentCant;
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+    function changeCant(v) {
+        currentCant = Math.max(1, Math.min(currentTool.cantidad, currentCant + v));
+        document.getElementById('modal-cant').innerText = currentCant;
+    }
+
+    async function confirmarPedido() {
+        const user = document.getElementById('user-name').value.toUpperCase();
+        const task = document.getElementById('user-task').value.toUpperCase();
+
+        if (!user || !task) return alert('LLENA LOS CAMPOS');
+
+        document.getElementById('loading-bar').style.width = '50%';
         
-        // Montar la app
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
+        const { error } = await supabase.from('pedidos').insert([{
+            herramienta_id: currentTool.id,
+            herramienta_nombre: currentTool.nombre,
+            usuario_nombre: user,
+            tarea: task,
+            cantidad_pedida: currentCant,
+            foto_url: currentTool.foto_url
+        }]);
+
+        if (error) alert("Error de conexión, intenta de nuevo");
+        else {
+            closeModal();
+            sync(); // Actualiza el stock
+        }
+    }
+
+    function toggleAdmin() {
+        const p = prompt("PIN:");
+        if (p === "123") {
+            isAdmin = !isAdmin;
+            document.getElementById('admin-btn').innerText = isAdmin ? 'SALIR' : 'ADMIN';
+            alert("Modo Admin: Esta versión es solo para pedidos rápidos.");
+        }
+    }
+
+    // Inicio
+    sync();
+    // Auto-update cada 30 segundos por si alguien más pide algo
+    setInterval(sync, 30000);
+</script>
 </body>
 </html>
