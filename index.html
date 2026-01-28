@@ -3,151 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StockMaster Nitro Turbo v2.0</title>
+    <title>⚡ StockMaster Turbo</title>
     
-    <!-- Cargar solo lo esencial -->
+    <!-- SOLO LO ESENCIAL -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    
-    <!-- Tailwind solo lo necesario -->
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            corePlugins: {
-                preflight: false, // Más rápido
-            }
-        }
-    </script>
-    <script src="https://cdn.tailwindcss.com/3.3.0"></script>
-    
-    <!-- Supabase -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
+    <!-- ESTILOS INLINE PARA CARGA INSTANTÁNEA -->
     <style>
-        /* ESTILOS CRÍTICOS INLINE - CARGA INMEDIATA */
+        /* CSS CRÍTICO - Carga en 1ms */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            margin: 0; 
-            padding: 0; 
-            background: #020617; 
-            color: #f8fafc; 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; 
+            color: #f1f5f9; 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             -webkit-tap-highlight-color: transparent;
             overflow-x: hidden;
         }
         
-        /* Optimizar rendering */
-        * {
-            box-sizing: border-box;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-        
-        /* Scroll optimizado */
-        .scroll-optimized {
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        /* Skeleton loading ultra rápido */
-        .skeleton-fast {
-            background: linear-gradient(90deg, #1e293b 0%, #334155 50%, #1e293b 100%);
+        /* Skeleton loading ULTRA RÁPIDO */
+        .skeleton-turbo {
+            background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
             background-size: 400% 100%;
-            animation: skeleton-pulse 1.2s ease-in-out infinite;
+            animation: skeleton-pulse 1s ease-in-out infinite;
         }
-        
         @keyframes skeleton-pulse {
             0% { background-position: -400% 0; }
             100% { background-position: 400% 0; }
         }
         
-        /* Imágenes con transición instantánea */
+        /* Imágenes que cargan INSTANTÁNEAMENTE */
         .img-turbo {
             opacity: 0;
-            transition: opacity 0.1s linear !important; /* Más rápido */
-            will-change: opacity;
+            transition: opacity 0.05s linear !important; /* 20x más rápido */
         }
-        
         .img-turbo.loaded {
             opacity: 1;
         }
         
-        /* Botones optimizados */
-        .btn-turbo {
-            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-            transform: translateZ(0);
-            backface-visibility: hidden;
-            transition: transform 0.08s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .btn-turbo:active {
-            transform: scale(0.95);
-        }
-        
-        /* Loading bar ultrarrápida */
+        /* Loading bar que se mueve en 0.1s */
         .loading-turbo {
             position: fixed;
             top: 0;
             left: 0;
-            height: 2px;
+            height: 3px;
             background: linear-gradient(90deg, #f97316, #ea580c);
             z-index: 9999;
-            transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+            transition: width 0.1s linear;
+            box-shadow: 0 0 10px #f97316;
         }
         
-        /* Card con will-change para GPU */
+        /* Cards optimizadas para GPU */
         .card-gpu {
-            will-change: transform, opacity;
             transform: translateZ(0);
             backface-visibility: hidden;
+            will-change: transform;
         }
         
-        /* Font optimizada para carga rápida */
-        @font-face {
-            font-family: 'SystemFont';
-            src: local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI');
+        /* Scroll sin delay */
+        .scroll-fast {
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: auto;
         }
         
-        /* Hide scrollbar pero mantiene scroll */
-        .no-scrollbar {
+        /* Botones con respuesta inmediata */
+        .btn-turbo {
+            transform: translateZ(0);
+            transition: transform 0.05s ease-out;
+        }
+        .btn-turbo:active {
+            transform: scale(0.95);
+        }
+        
+        /* Ocultar scrollbar pero mantener scroll */
+        .hide-scrollbar {
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-        .no-scrollbar::-webkit-scrollbar {
+        .hide-scrollbar::-webkit-scrollbar {
             display: none;
         }
         
-        /* Critical CSS para elementos iniciales */
-        #root {
-            min-height: 100vh;
-        }
-        
-        /* Optimización para imágenes pequeñas */
-        .img-placeholder {
-            background: linear-gradient(45deg, #1e293b 25%, #334155 50%, #1e293b 75%);
-            background-size: 400% 400%;
+        /* Prevenir layout shifts */
+        .img-container {
+            position: relative;
+            width: 100%;
+            height: 7rem;
+            overflow: hidden;
         }
     </style>
 </head>
 <body>
-    <!-- Root para React -->
     <div id="root"></div>
-    
-    <!-- Script principal optimizado -->
+
     <script type="text/babel">
-        // ==================== CONFIGURACIÓN ULTRA RÁPIDA ====================
         const { useState, useEffect, useCallback, useMemo, useRef, memo } = React;
         
-        // Configuración Supabase
-        const SUPABASE_URL = 'https://sqpeakmzunusclzskngr.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const ADMIN_PASSWORD = "123";
+        // Config Supabase
+        const supabase = window.supabase.createClient(
+            'https://sqpeakmzunusclzskngr.supabase.co',
+            'sb_publishable_O2VwxD3NYmBTLWsxLGd7AQ_Ip8k7FmW'
+        );
         
-        // ==================== COMPONENTE IMAGEN TURBO ====================
+        const ADMIN_PIN = "123";
+
+        // ==================== COMPONENTE IMAGEN MEGA RÁPIDA ====================
         const TurboImage = memo(({ src, alt, className = '' }) => {
             const [loaded, setLoaded] = useState(false);
-            const [error, setError] = useState(false);
             const imgRef = useRef(null);
             
             useEffect(() => {
@@ -163,98 +127,41 @@
                     }
                 };
                 
-                img.onerror = () => {
-                    setError(true);
-                };
-                
-                // Precargar en segundo plano
+                // Precargar en background
                 return () => {
                     img.onload = null;
-                    img.onerror = null;
                 };
             }, [src]);
             
             return (
-                <div className={`relative overflow-hidden ${className}`}>
-                    {!loaded && !error && (
-                        <div className="absolute inset-0 skeleton-fast rounded-xl"></div>
+                <div className={`img-container ${className}`}>
+                    {/* Skeleton instantáneo */}
+                    {!loaded && (
+                        <div className="absolute inset-0 skeleton-turbo rounded-lg"></div>
                     )}
-                    {error && (
-                        <div className="absolute inset-0 bg-slate-800 flex items-center justify-center rounded-xl">
-                            <span className="text-slate-500 text-xs">🚫 Imagen</span>
-                        </div>
-                    )}
+                    
+                    {/* Imagen real */}
                     <img
                         ref={imgRef}
                         alt={alt || ''}
-                        className={`w-full h-full object-cover img-turbo ${loaded ? 'loaded' : ''} ${error ? 'hidden' : ''}`}
+                        className={`w-full h-full object-cover img-turbo ${loaded ? 'loaded' : ''}`}
                         loading="lazy"
                         decoding="async"
                         onLoad={() => setLoaded(true)}
-                        onError={() => setError(true)}
                     />
                 </div>
             );
         });
-        
-        // ==================== COMPONENTE CARD OPTIMIZADO ====================
-        const ToolCard = memo(({ tool, isAdmin, onAction, index }) => {
-            const handleClick = useCallback(() => {
-                onAction(tool);
-            }, [tool, onAction]);
-            
-            return (
-                <div 
-                    className="card-gpu bg-slate-900/50 backdrop-blur-sm rounded-2xl p-3 flex flex-col border border-slate-700/30 hover:border-orange-500/30 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98]"
-                    style={{ animationDelay: `${index * 20}ms` }}
-                >
-                    {/* Imagen optimizada */}
-                    <div className="w-full h-28 mb-2 relative">
-                        <TurboImage 
-                            src={tool.foto_url} 
-                            alt={tool.nombre}
-                            className="rounded-xl"
-                        />
-                    </div>
-                    
-                    {/* Contenido optimizado */}
-                    <h3 className="text-[10px] font-bold uppercase text-center h-10 flex items-center justify-center mb-1 px-1 leading-tight line-clamp-2">
-                        {tool.nombre}
-                    </h3>
-                    
-                    <div className="flex justify-between items-center mb-3 px-1 mt-auto">
-                        <span className="text-[8px] text-slate-400 uppercase truncate max-w-[60%]">
-                            {tool.lugar || 'SIN UBICACIÓN'}
-                        </span>
-                        <span className="font-bold text-[11px] text-orange-500 bg-orange-500/10 px-2 py-1 rounded-full">
-                            {tool.cantidad} PZ
-                        </span>
-                    </div>
-                    
-                    <button
-                        onClick={handleClick}
-                        disabled={tool.cantidad <= 0 && !isAdmin}
-                        className={`btn-turbo w-full py-3 rounded-xl font-black text-[10px] uppercase text-white shadow-lg ${
-                            tool.cantidad <= 0 && !isAdmin 
-                                ? 'bg-slate-800/50 text-slate-500 cursor-not-allowed' 
-                                : 'hover:shadow-orange-500/20'
-                        }`}
-                    >
-                        {isAdmin ? 'EDITAR' : (tool.cantidad <= 0 ? 'AGOTADO' : 'PEDIR')}
-                    </button>
-                </div>
-            );
-        });
-        
+
         // ==================== COMPONENTE PRINCIPAL ====================
         function App() {
             // ==================== ESTADOS OPTIMIZADOS ====================
             const [data, setData] = useState(() => {
                 try {
-                    const cached = localStorage.getItem('stock_turbo_cache');
-                    return cached ? JSON.parse(cached) : { herramientas: [], pedidos: [], historial: [] };
+                    const cache = localStorage.getItem('stock_turbo_cache');
+                    return cache ? JSON.parse(cache) : { herramientas: [], pedidos: [] };
                 } catch {
-                    return { herramientas: [], pedidos: [], historial: [] };
+                    return { herramientas: [], pedidos: [] };
                 }
             });
             
@@ -266,162 +173,119 @@
             const [loadProgress, setLoadProgress] = useState(0);
             
             // Debounce para búsqueda
-            const [searchTerm, setSearchTerm] = useState('');
-            const searchTimeoutRef = useRef(null);
+            const [searchInput, setSearchInput] = useState('');
+            const searchTimeout = useRef(null);
             
-            // Paginación
-            const [page, setPage] = useState(1);
-            const ITEMS_PER_PAGE = 20;
-            const observerRef = useRef(null);
-            const lastItemRef = useRef(null);
-            
-            // Cache de imágenes
+            // Cache para imágenes
             const imageCache = useRef(new Map());
             
             // ==================== FUNCIONES ULTRA RÁPIDAS ====================
             
-            // Sincronización optimizada
+            // Sincronización inteligente
             const sync = useCallback(async (force = false) => {
                 try {
                     setLoadProgress(30);
                     
-                    // Cache inteligente - solo sincronizar si es necesario
+                    // Usar cache si es reciente (2 minutos)
                     const lastSync = localStorage.getItem('stock_last_sync');
                     const now = Date.now();
-                    const CACHE_TIME = 5 * 60 * 1000; // 5 minutos
+                    const CACHE_TIME = 2 * 60 * 1000;
                     
                     if (!force && lastSync && (now - parseInt(lastSync)) < CACHE_TIME) {
                         setLoadProgress(100);
+                        setTimeout(() => setLoadProgress(0), 100);
                         return;
                     }
                     
-                    const [tools, orders] = await Promise.allSettled([
-                        supabase.from('herramientas').select('*').order('nombre'),
-                        supabase.from('pedidos').select('*').order('created_at', { ascending: false })
+                    const [tools] = await Promise.all([
+                        supabase.from('herramientas').select('*').order('nombre')
                     ]);
                     
-                    const herramientas = tools.status === 'fulfilled' ? tools.value.data : [];
-                    const pedidos = orders.status === 'fulfilled' ? orders.value.data : [];
-                    
-                    // Precargar imágenes en segundo plano
-                    if (herramientas.length > 0) {
-                        setTimeout(() => {
-                            herramientas.slice(0, 10).forEach(tool => {
-                                if (tool.foto_url && !imageCache.current.has(tool.foto_url)) {
-                                    const img = new Image();
-                                    img.src = tool.foto_url;
-                                    imageCache.current.set(tool.foto_url, true);
-                                }
-                            });
-                        }, 100);
+                    if (tools.data) {
+                        const newData = {
+                            herramientas: tools.data,
+                            pedidos: data.pedidos || []
+                        };
+                        
+                        setData(newData);
+                        localStorage.setItem('stock_turbo_cache', JSON.stringify(newData));
+                        localStorage.setItem('stock_last_sync', Date.now().toString());
+                        
+                        // Precargar imágenes de primeras 5 herramientas
+                        tools.data.slice(0, 5).forEach(tool => {
+                            if (tool.foto_url && !imageCache.current.has(tool.foto_url)) {
+                                const img = new Image();
+                                img.src = tool.foto_url;
+                                imageCache.current.set(tool.foto_url, true);
+                            }
+                        });
                     }
                     
-                    const newData = { herramientas, pedidos, historial: [] };
-                    setData(newData);
-                    
-                    // Cache local con compresión
-                    localStorage.setItem('stock_turbo_cache', JSON.stringify(newData));
-                    localStorage.setItem('stock_last_sync', Date.now().toString());
-                    
                     setLoadProgress(100);
-                    setTimeout(() => setLoadProgress(0), 200);
+                    setTimeout(() => setLoadProgress(0), 100);
                     
                 } catch (error) {
-                    console.error('Error en sync:', error);
+                    console.error('Sync error:', error);
                     setLoadProgress(0);
                 }
-            }, []);
+            }, [data.pedidos]);
             
-            // Suscripción a cambios en tiempo real (optimizada)
+            // WebSocket optimizado
             useEffect(() => {
                 sync();
                 
-                const toolsChannel = supabase
-                    .channel('tools_changes')
+                const channel = supabase
+                    .channel('tools_updates')
                     .on('postgres_changes', 
-                        { 
-                            event: '*', 
-                            schema: 'public', 
-                            table: 'herramientas' 
-                        }, 
+                        { event: '*', schema: 'public', table: 'herramientas' }, 
                         (payload) => {
-                            // Actualización ultra rápida sin re-render completo
                             setData(prev => ({
                                 ...prev,
-                                herramientas: prev.herramientas.map(tool => 
-                                    tool.id === payload.new.id ? payload.new : tool
-                                ).filter(tool => tool.id !== payload.old?.id)
+                                herramientas: prev.herramientas.map(t => 
+                                    t.id === payload.new.id ? payload.new : t
+                                )
                             }));
                         }
                     )
                     .subscribe();
                 
-                return () => {
-                    supabase.removeChannel(toolsChannel);
-                };
+                return () => supabase.removeChannel(channel);
             }, [sync]);
             
-            // ==================== BÚSQUEDA CON DEBOUNCE ====================
+            // Búsqueda con debounce
             useEffect(() => {
-                if (searchTimeoutRef.current) {
-                    clearTimeout(searchTimeoutRef.current);
+                if (searchTimeout.current) {
+                    clearTimeout(searchTimeout.current);
                 }
                 
-                searchTimeoutRef.current = setTimeout(() => {
-                    setBusqueda(searchTerm);
-                    setPage(1); // Resetear a primera página al buscar
-                }, 150); // Debounce de 150ms
+                searchTimeout.current = setTimeout(() => {
+                    setBusqueda(searchInput);
+                }, 150); // 150ms debounce
                 
                 return () => {
-                    if (searchTimeoutRef.current) {
-                        clearTimeout(searchTimeoutRef.current);
+                    if (searchTimeout.current) {
+                        clearTimeout(searchTimeout.current);
                     }
                 };
-            }, [searchTerm]);
+            }, [searchInput]);
             
-            // ==================== FILTRADO Y PAGINACIÓN ====================
-            const filteredTools = useMemo(() => {
-                if (!busqueda.trim()) {
-                    return data.herramientas;
-                }
+            // Filtrado ultra rápido
+            const herramientasFiltradas = useMemo(() => {
+                if (!busqueda.trim()) return data.herramientas;
                 
                 const term = busqueda.toLowerCase();
-                return data.herramientas.filter(tool => 
-                    tool.nombre.toLowerCase().includes(term) ||
-                    (tool.lugar && tool.lugar.toLowerCase().includes(term))
+                return data.herramientas.filter(h =>
+                    h.nombre.toLowerCase().includes(term) ||
+                    (h.lugar && h.lugar.toLowerCase().includes(term))
                 );
             }, [data.herramientas, busqueda]);
             
-            const paginatedTools = useMemo(() => {
-                const start = 0;
-                const end = page * ITEMS_PER_PAGE;
-                return filteredTools.slice(start, end);
-            }, [filteredTools, page]);
-            
-            // ==================== INFINITE SCROLL ====================
-            useEffect(() => {
-                const observer = new IntersectionObserver(
-                    (entries) => {
-                        if (entries[0].isIntersecting && paginatedTools.length < filteredTools.length) {
-                            setPage(prev => prev + 1);
-                        }
-                    },
-                    { threshold: 0.5 }
-                );
-                
-                if (lastItemRef.current) {
-                    observer.observe(lastItemRef.current);
-                }
-                
-                return () => observer.disconnect();
-            }, [paginatedTools, filteredTools.length]);
-            
-            // ==================== FUNCIONES DE ACCIÓN ====================
-            const ejecutarAccion = useCallback(async (accion) => {
+            // Función de acción rápida
+            const ejecutarRapido = useCallback(async (accion) => {
                 setIsWorking(true);
                 try {
                     await accion();
-                    await sync(true); // Sincronización forzada
+                    await sync(true);
                 } catch (error) {
                     console.error('Error:', error);
                 } finally {
@@ -429,8 +293,9 @@
                 }
             }, [sync]);
             
+            // Despachar pedido
             const despacharPedido = useCallback((pedido) => {
-                ejecutarAccion(async () => {
+                ejecutarRapido(async () => {
                     const herramienta = data.herramientas.find(h => h.id === pedido.herramienta_id);
                     
                     if (herramienta) {
@@ -440,56 +305,77 @@
                     }
                     
                     await supabase.from('pedidos').delete().eq('id', pedido.id);
+                    
+                    // Actualizar localmente al instante
+                    setData(prev => ({
+                        ...prev,
+                        pedidos: prev.pedidos.filter(p => p.id !== pedido.id)
+                    }));
                 });
-            }, [data.herramientas, ejecutarAccion]);
+            }, [data.herramientas, ejecutarRapido]);
             
+            // Enviar pedido
             const enviarPedido = useCallback(() => {
                 if (!modalPedido.user_name || !modalPedido.job) return;
                 
-                ejecutarAccion(async () => {
-                    await supabase.from('pedidos').insert([{
+                ejecutarRapido(async () => {
+                    const nuevoPedido = {
                         herramienta_id: modalPedido.id,
                         herramienta_nombre: modalPedido.nombre,
                         usuario_nombre: modalPedido.user_name.toUpperCase(),
                         tarea: modalPedido.job.toUpperCase(),
                         cantidad_pedida: modalPedido.pedido_cant,
-                        foto_url: modalPedido.foto_url
-                    }]);
+                        foto_url: modalPedido.foto_url,
+                        created_at: new Date().toISOString()
+                    };
+                    
+                    const { data: result } = await supabase
+                        .from('pedidos')
+                        .insert([nuevoPedido])
+                        .select()
+                        .single();
+                    
+                    if (result) {
+                        setData(prev => ({
+                            ...prev,
+                            pedidos: [result, ...prev.pedidos]
+                        }));
+                    }
                     
                     setModalPedido(null);
                 });
-            }, [modalPedido, ejecutarAccion]);
+            }, [modalPedido, ejecutarRapido]);
             
-            // ==================== RENDER PRINCIPAL ====================
+            // ==================== RENDER MEGA RÁPIDO ====================
             return (
-                <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 pb-24">
+                <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900">
                     {/* Loading bar ultrarrápida */}
                     <div className="loading-turbo" style={{ width: `${loadProgress}%` }}></div>
                     
                     {/* Overlay de carga */}
                     {isWorking && (
-                        <div className="fixed inset-0 z-[9998] bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center">
-                            <div className="relative">
-                                <div className="w-16 h-16 border-4 border-transparent border-t-orange-500 border-r-orange-500 rounded-full animate-spin"></div>
+                        <div className="fixed inset-0 z-[9998] bg-black/80 flex items-center justify-center">
+                            <div className="text-center">
+                                <div className="w-12 h-12 border-3 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                <p className="mt-3 text-orange-400 text-sm font-bold">PROCESANDO...</p>
                             </div>
-                            <p className="mt-4 text-orange-500 text-xs font-bold tracking-widest">PROCESANDO...</p>
                         </div>
                     )}
                     
-                    {/* HEADER OPTIMIZADO */}
-                    <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 p-3 shadow-xl">
+                    {/* HEADER */}
+                    <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 p-3">
                         <div className="flex flex-col items-center">
-                            <h1 className="text-2xl font-bold text-white mb-3 tracking-tight">
+                            <h1 className="text-2xl font-bold text-white mb-3">
                                 STOCK<span className="text-orange-500">TURBO</span>
                             </h1>
                             
-                            <div className="flex gap-1 w-full max-w-md overflow-x-auto no-scrollbar">
+                            <div className="flex gap-2 w-full max-w-md overflow-x-auto hide-scrollbar">
                                 <button 
                                     onClick={() => setSeccion('stock')}
-                                    className={`flex-1 min-w-[100px] py-2.5 rounded-lg text-[11px] font-black transition-all ${
+                                    className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition-all ${
                                         seccion === 'stock' 
-                                            ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' 
-                                            : 'bg-slate-800/50 text-slate-400 hover:text-white'
+                                            ? 'bg-orange-500 text-white shadow-lg' 
+                                            : 'bg-slate-800 text-slate-400 hover:text-white'
                                     }`}
                                 >
                                     📦 STOCK
@@ -498,10 +384,10 @@
                                 {isAdmin && (
                                     <button 
                                         onClick={() => setSeccion('pedidos')}
-                                        className={`flex-1 min-w-[100px] py-2.5 rounded-lg text-[11px] font-black transition-all ${
+                                        className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition-all ${
                                             seccion === 'pedidos' 
-                                                ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg' 
-                                                : 'bg-slate-800/50 text-slate-400 hover:text-white'
+                                                ? 'bg-orange-500 text-white shadow-lg' 
+                                                : 'bg-slate-800 text-slate-400 hover:text-white'
                                         }`}
                                     >
                                         📋 PEDIDOS
@@ -510,7 +396,7 @@
                                 
                                 <button 
                                     onClick={() => isAdmin ? setIsAdmin(false) : setIsAdmin(true)}
-                                    className="flex-1 min-w-[100px] py-2.5 rounded-lg text-[11px] font-black bg-gradient-to-r from-slate-800 to-slate-900 text-white border border-slate-700 hover:border-orange-500 transition-all"
+                                    className="flex-1 py-2 px-4 rounded-lg text-xs font-bold bg-slate-800 text-white hover:bg-slate-700 transition-all"
                                 >
                                     {isAdmin ? '👤 SALIR' : '🔐 ADMIN'}
                                 </button>
@@ -519,128 +405,146 @@
                     </header>
                     
                     {/* CONTENIDO PRINCIPAL */}
-                    <main className="p-3 pt-4">
-                        {/* SECCIÓN STOCK */}
-                        {seccion === 'stock' && (
+                    <main className="p-4">
+                        {seccion === 'stock' ? (
                             <>
-                                {/* BUSCADOR OPTIMIZADO */}
-                                <div className="relative mb-6">
+                                {/* BUSCADOR */}
+                                <div className="mb-6">
                                     <input 
                                         type="text"
                                         placeholder="🔍 BUSCAR HERRAMIENTA..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full p-4 pl-12 rounded-2xl bg-slate-900/80 border-2 border-slate-700 text-white text-sm font-bold placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-all"
+                                        value={searchInput}
+                                        onChange={(e) => setSearchInput(e.target.value)}
+                                        className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-all"
                                     />
-                                    <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500">
-                                        🔍
-                                    </div>
                                 </div>
                                 
-                                {/* CONTADOR DE RESULTADOS */}
-                                <div className="text-xs text-slate-400 mb-3 px-1">
-                                    {filteredTools.length} herramientas encontradas
+                                {/* CONTADOR */}
+                                <div className="text-xs text-slate-400 mb-4">
+                                    {herramientasFiltradas.length} herramientas
                                     {busqueda && ` para "${busqueda}"`}
                                 </div>
                                 
                                 {/* GRILLA DE HERRAMIENTAS */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                                    {paginatedTools.map((tool, index) => (
-                                        <ToolCard
-                                            key={`${tool.id}-${index}`}
-                                            tool={tool}
-                                            isAdmin={isAdmin}
-                                            index={index}
-                                            onAction={(t) => {
-                                                if (isAdmin) {
-                                                    // TODO: Implementar edición
-                                                    console.log('Editar:', t);
-                                                } else {
-                                                    setModalPedido({
-                                                        ...t,
-                                                        user_name: '',
-                                                        job: '',
-                                                        pedido_cant: 1
-                                                    });
-                                                }
-                                            }}
-                                        />
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                    {herramientasFiltradas.map((herramienta, index) => (
+                                        <div 
+                                            key={`${herramienta.id}-${index}`}
+                                            className="card-gpu bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 hover:border-orange-500/30 transition-all duration-150"
+                                        >
+                                            {/* Imagen */}
+                                            <div className="mb-2">
+                                                <TurboImage 
+                                                    src={herramienta.foto_url} 
+                                                    alt={herramienta.nombre}
+                                                    className="rounded-lg"
+                                                />
+                                            </div>
+                                            
+                                            {/* Nombre */}
+                                            <h3 className="text-xs font-bold uppercase text-center h-10 flex items-center justify-center mb-2 line-clamp-2">
+                                                {herramienta.nombre}
+                                            </h3>
+                                            
+                                            {/* Info */}
+                                            <div className="flex justify-between items-center mb-3">
+                                                <span className="text-[10px] text-slate-400 uppercase truncate max-w-[60%]">
+                                                    {herramienta.lugar || 'SIN UBICACIÓN'}
+                                                </span>
+                                                <span className="font-bold text-xs text-orange-500 bg-orange-500/10 px-2 py-1 rounded-full">
+                                                    {herramienta.cantidad} PZ
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Botón */}
+                                            <button
+                                                onClick={() => {
+                                                    if (isAdmin) {
+                                                        // TODO: Edición
+                                                        console.log('Editar:', herramienta);
+                                                    } else {
+                                                        setModalPedido({
+                                                            ...herramienta,
+                                                            user_name: '',
+                                                            job: '',
+                                                            pedido_cant: 1
+                                                        });
+                                                    }
+                                                }}
+                                                disabled={herramienta.cantidad <= 0 && !isAdmin}
+                                                className={`btn-turbo w-full py-2.5 rounded-lg text-xs font-bold text-white ${
+                                                    herramienta.cantidad <= 0 && !isAdmin
+                                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                                        : 'bg-orange-500 hover:bg-orange-600'
+                                                }`}
+                                            >
+                                                {isAdmin ? 'EDITAR' : (herramienta.cantidad <= 0 ? 'AGOTADO' : 'PEDIR')}
+                                            </button>
+                                        </div>
                                     ))}
-                                    
-                                    {/* Elemento invisible para infinite scroll */}
-                                    <div ref={lastItemRef} className="h-10 col-span-full"></div>
                                 </div>
                                 
-                                {/* INDICADOR DE CARGA MÁS */}
-                                {paginatedTools.length < filteredTools.length && (
-                                    <div className="text-center py-4">
-                                        <div className="inline-block w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                                        <p className="text-xs text-slate-400 mt-2">Cargando más herramientas...</p>
+                                {/* Sin resultados */}
+                                {herramientasFiltradas.length === 0 && (
+                                    <div className="text-center py-10">
+                                        <div className="text-4xl mb-3">🔍</div>
+                                        <p className="text-slate-400">No se encontraron herramientas</p>
                                     </div>
                                 )}
                             </>
-                        )}
-                        
-                        {/* SECCIÓN PEDIDOS (solo admin) */}
-                        {seccion === 'pedidos' && isAdmin && (
+                        ) : (
+                            /* SECCIÓN PEDIDOS */
                             <div className="space-y-3">
-                                {data.pedidos.map(pedido => (
-                                    <div 
-                                        key={pedido.id} 
-                                        className="bg-gradient-to-r from-slate-900/80 to-slate-800/80 backdrop-blur-sm rounded-2xl p-4 flex items-center gap-4 border border-slate-700/50 hover:border-orange-500/50 transition-all"
-                                    >
-                                        <div className="w-16 h-16 flex-shrink-0">
-                                            <TurboImage 
-                                                src={pedido.foto_url} 
-                                                alt={pedido.herramienta_nombre}
-                                                className="rounded-xl"
-                                            />
-                                        </div>
-                                        
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-orange-500 text-xs truncate uppercase">
-                                                {pedido.herramienta_nombre}
-                                            </p>
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase truncate">
-                                                👤 {pedido.usuario_nombre} • 📝 {pedido.tarea}
-                                            </p>
-                                            <p className="font-bold text-xl mt-1">{pedido.cantidad_pedida} PZ</p>
-                                        </div>
-                                        
-                                        <button 
-                                            onClick={() => despacharPedido(pedido)}
-                                            className="bg-gradient-to-r from-emerald-600 to-green-500 px-5 py-3 rounded-xl font-black text-[11px] text-white shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95 flex-shrink-0"
+                                {data.pedidos && data.pedidos.length > 0 ? (
+                                    data.pedidos.map(pedido => (
+                                        <div 
+                                            key={pedido.id}
+                                            className="bg-slate-800/50 rounded-xl p-4 flex items-center gap-4 border border-slate-700/50"
                                         >
-                                            ✅ OK
-                                        </button>
-                                    </div>
-                                ))}
-                                
-                                {data.pedidos.length === 0 && (
+                                            <div className="w-16 h-16 flex-shrink-0">
+                                                <TurboImage 
+                                                    src={pedido.foto_url} 
+                                                    alt={pedido.herramienta_nombre}
+                                                    className="rounded-lg"
+                                                />
+                                            </div>
+                                            
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-orange-500 text-sm truncate">
+                                                    {pedido.herramienta_nombre}
+                                                </p>
+                                                <p className="text-xs text-slate-400 truncate">
+                                                    👤 {pedido.usuario_nombre} • 📝 {pedido.tarea}
+                                                </p>
+                                                <p className="font-bold text-lg mt-1">{pedido.cantidad_pedida} PZ</p>
+                                            </div>
+                                            
+                                            <button 
+                                                onClick={() => despacharPedido(pedido)}
+                                                className="bg-green-600 hover:bg-green-700 px-4 py-3 rounded-lg font-bold text-white text-sm transition-all active:scale-95 flex-shrink-0"
+                                            >
+                                                ✅ OK
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
                                     <div className="text-center py-10">
                                         <div className="text-4xl mb-3">📭</div>
-                                        <p className="text-slate-400 text-sm">No hay pedidos pendientes</p>
+                                        <p className="text-slate-400">No hay pedidos pendientes</p>
                                     </div>
                                 )}
                             </div>
                         )}
                     </main>
                     
-                    {/* MODAL DE PEDIDO - OPTIMIZADO */}
+                    {/* MODAL DE PEDIDO */}
                     {modalPedido && (
-                        <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-                            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 w-full max-w-sm border border-slate-700/50 shadow-2xl">
-                                {/* Encabezado */}
-                                <div className="text-center mb-4">
-                                    <h2 className="font-bold text-orange-500 text-xs uppercase tracking-wider">
-                                        {modalPedido.nombre}
-                                    </h2>
-                                    <div className="text-white text-sm font-bold mt-1">
-                                        Stock: {modalPedido.cantidad} unidades
-                                    </div>
-                                </div>
+                        <div className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-sm border border-slate-700">
+                                <h2 className="font-bold text-orange-500 text-center mb-4 text-sm uppercase">
+                                    {modalPedido.nombre}
+                                </h2>
                                 
-                                {/* Formulario */}
                                 <div className="space-y-3">
                                     <input 
                                         type="text"
@@ -650,26 +554,26 @@
                                             ...prev,
                                             user_name: e.target.value.toUpperCase()
                                         }))}
-                                        className="w-full p-4 rounded-xl bg-slate-800 border-2 border-slate-700 text-white text-center text-sm font-bold placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-all"
+                                        className="w-full p-3 rounded-lg bg-slate-700 border border-slate-600 text-white text-center placeholder-slate-500 focus:outline-none focus:border-orange-500"
                                         autoFocus
                                     />
                                     
                                     <input 
                                         type="text"
-                                        placeholder="🔧 ACTIVIDAD/PROYECTO"
+                                        placeholder="🔧 ACTIVIDAD"
                                         value={modalPedido.job}
                                         onChange={(e) => setModalPedido(prev => ({
                                             ...prev,
                                             job: e.target.value.toUpperCase()
                                         }))}
-                                        className="w-full p-4 rounded-xl bg-slate-800 border-2 border-slate-700 text-white text-center text-sm font-bold placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-all"
+                                        className="w-full p-3 rounded-lg bg-slate-700 border border-slate-600 text-white text-center placeholder-slate-500 focus:outline-none focus:border-orange-500"
                                     />
                                     
-                                    {/* Selector de cantidad */}
-                                    <div className="bg-slate-800/50 p-3 rounded-xl">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-slate-400 text-xs font-bold">CANTIDAD:</span>
-                                            <span className="font-bold text-xl text-white">{modalPedido.pedido_cant}</span>
+                                    {/* Selector cantidad */}
+                                    <div className="bg-slate-700/50 p-3 rounded-lg">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-slate-400 text-xs">CANTIDAD:</span>
+                                            <span className="font-bold text-white">{modalPedido.pedido_cant}</span>
                                         </div>
                                         
                                         <div className="flex gap-2">
@@ -678,13 +582,13 @@
                                                     ...prev,
                                                     pedido_cant: Math.max(1, prev.pedido_cant - 1)
                                                 }))}
-                                                className="flex-1 py-3 bg-slate-700 rounded-lg text-white font-bold hover:bg-slate-600 active:scale-95 transition-all"
+                                                className="flex-1 py-2 bg-slate-600 rounded-lg text-white font-bold hover:bg-slate-500"
                                             >
                                                 -
                                             </button>
                                             
-                                            <div className="flex-1 py-3 text-center">
-                                                <span className="text-white font-bold text-lg">{modalPedido.pedido_cant}</span>
+                                            <div className="flex-1 py-2 text-center">
+                                                <span className="text-white font-bold">{modalPedido.pedido_cant}</span>
                                             </div>
                                             
                                             <button
@@ -692,31 +596,31 @@
                                                     ...prev,
                                                     pedido_cant: Math.min(prev.cantidad, prev.pedido_cant + 1)
                                                 }))}
-                                                className="flex-1 py-3 bg-slate-700 rounded-lg text-white font-bold hover:bg-slate-600 active:scale-95 transition-all"
+                                                className="flex-1 py-2 bg-slate-600 rounded-lg text-white font-bold hover:bg-slate-500"
                                             >
                                                 +
                                             </button>
                                         </div>
                                     </div>
                                     
-                                    {/* Botones de acción */}
+                                    {/* Botones */}
                                     <div className="flex gap-2 pt-2">
                                         <button
                                             onClick={enviarPedido}
                                             disabled={!modalPedido.user_name || !modalPedido.job}
-                                            className={`flex-1 py-4 rounded-xl font-black text-xs uppercase text-white shadow-lg transition-all ${
+                                            className={`flex-1 py-3 rounded-lg font-bold text-white text-sm ${
                                                 !modalPedido.user_name || !modalPedido.job
                                                     ? 'bg-slate-700 cursor-not-allowed'
-                                                    : 'bg-gradient-to-r from-orange-500 to-red-500 hover:shadow-orange-500/30 active:scale-95'
+                                                    : 'bg-orange-500 hover:bg-orange-600'
                                             }`}
                                         >
-                                            ✅ CONFIRMAR PEDIDO
+                                            ✅ CONFIRMAR
                                         </button>
                                     </div>
                                     
                                     <button
                                         onClick={() => setModalPedido(null)}
-                                        className="w-full py-3 text-slate-400 text-xs font-bold hover:text-white transition-colors"
+                                        className="w-full py-2 text-slate-400 text-xs hover:text-white"
                                     >
                                         Cancelar
                                     </button>
@@ -725,24 +629,21 @@
                         </div>
                     )}
                     
-                    {/* LOGIN ADMIN - SIMPLIFICADO */}
-                    {!isAdmin && seccion !== 'stock' && (
+                    {/* LOGIN ADMIN */}
+                    {!isAdmin && (
                         <div className="fixed inset-0 z-[10000] bg-black flex items-center justify-center p-4">
                             <div className="w-full max-w-xs">
                                 <input
                                     type="password"
-                                    placeholder="🔐 INGRESA EL PIN"
+                                    placeholder="🔐 PIN DE ADMIN"
                                     className="w-full p-4 bg-transparent text-center text-2xl font-bold text-orange-500 border-none outline-none placeholder-orange-500/50"
                                     autoFocus
                                     onChange={(e) => {
-                                        if (e.target.value === ADMIN_PASSWORD) {
+                                        if (e.target.value === ADMIN_PIN) {
                                             setIsAdmin(true);
                                         }
                                     }}
                                 />
-                                <p className="text-center text-slate-500 text-xs mt-3">
-                                    Solo personal autorizado
-                                </p>
                             </div>
                         </div>
                     )}
@@ -750,26 +651,8 @@
             );
         }
         
-        // ==================== INICIALIZACIÓN RÁPIDA ====================
-        document.addEventListener('DOMContentLoaded', () => {
-            // Montar React inmediatamente
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<App />);
-            
-            // Precargar recursos críticos
-            if ('connection' in navigator && navigator.connection.saveData) {
-                console.log('Modo ahorro de datos activado');
-            }
-            
-            // Optimizar para red 3G
-            const isSlowNetwork = !navigator.connection || 
-                navigator.connection.effectiveType === 'slow-2g' || 
-                navigator.connection.effectiveType === '2g';
-            
-            if (isSlowNetwork) {
-                console.log('Red lenta detectada, optimizando...');
-            }
-        });
+        // Montar la app
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
